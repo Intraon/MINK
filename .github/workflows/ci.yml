@@ -1,11 +1,17 @@
 # Bygger appen og kører unittestene for hver pull request og hvert push til main.
 # Der signeres med Androids debug-nøgle; resultatet udgives ikke.
+#
+# Ændringer, der kun rører dokumentation, springes over: de kan ikke ændre bygget.
+# Bliver dette tjek et krav for at merge, skal filteret flyttes ind i jobbet. Ellers venter en ren
+# dokumentationsændring på et tjek, der aldrig kører.
 name: Byg og test
 
 on:
   pull_request:
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE', '.github/ISSUE_TEMPLATE/**']
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE', '.github/ISSUE_TEMPLATE/**']
 
 permissions:
   contents: read
