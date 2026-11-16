@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sh tools/build.sh)",
+      "Bash(./gradlew testReleaseUnitTest:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ],
+    "deny": [
+      "Read(keystore.properties)",
+      "Read(**/*.jks)",
+      "Read(**/*.keystore)"
+    ]
+  }
+}

@@ -1,0 +1,74 @@
+# Bygger MINK og lægger APK'en ud som en GitHub-udgivelse.
+# Startes i hånden: Actions → Udgiv → Run workflow.
+#
+# Versionen kommer fra bygget (0.4.<minutter siden 1.1.2026>), så hver kørsel giver en ny, højere version.
+# Udgivelsen får mærket v<version>, og filen hedder MINK.apk. Appen finder selv nye versioner ud fra netop de to
+# ting (se docs/arkitektur.md, "Opdatering"), så de må ikke ændres.
+#
+# Kræver tre hemmeligheder i repoet (Settings → Secrets and variables → Actions):
+#   MINK_KEYSTORE_B64    signeringsnøglen som base64 på én linje
+#   MINK_STORE_PASSWORD  adgangskoden til nøglen
+#   MINK_KEY_ALIAS       nøglens alias
+# Alle udgivelser skal signeres med samme nøgle, ellers kan appen ikke opdateres oven i den gamle.
+name: Udgiv
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  udgiv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Signeringsnøgle
+        env:
+          KEYSTORE_B64: ${{ secrets.MINK_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.MINK_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MINK_KEY_ALIAS }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ]; then
+            echo "::error::Signeringsnøglen mangler i repoets hemmeligheder. Der udgives ikke en APK med en anden nøgle."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/mink-release.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/mink-release.jks"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$STORE_PASSWORD"
+          } > keystore.properties
+
+      - name: Byg og test
+        run: sh tools/build.sh
+
+      - name: Kontrollér signatur og version
+        run: |
+          BT="$(ls -d "${ANDROID_HOME}"/build-tools/* | sort -V | tail -1)"
+          "$BT/apksigner" verify --print-certs dist/MINK.apk | tee signatur.txt
+          if grep -qi "CN=Android Debug" signatur.txt; then
+            echo "::error::APK'en er signeret med debug-nøglen."
+            exit 1
+          fi
+          VERSION="$("$BT/aapt2" dump badging dist/MINK.apk | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -1)"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          (cd dist && sha256sum MINK.apk > MINK.apk.sha256 && cat MINK.apk.sha256)
+
+      - name: Udgiv
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$VERSION" dist/MINK.apk dist/MINK.apk.sha256 \
+            --title "MINK $VERSION" --generate-notes --latest
+
+      - name: Ryd op
+        if: always()
+        run: rm -f keystore.properties "$RUNNER_TEMP/mink-release.jks"

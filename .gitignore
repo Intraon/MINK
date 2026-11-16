@@ -1,0 +1,13 @@
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+.kotlin/
+dist/
+
+# Signeringsnøglen hører aldrig hjemme i repoet
+keystore.properties
+*.jks
+*.keystore
