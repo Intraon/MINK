@@ -1,6 +1,8 @@
 # MINK – Mesh-INterferens-Kortlægger
 
-MINK gør en Android-telefon og en RTL-SDR til et håndholdt instrument, der finder smalle forstyrrelser i og omkring en LoRa-mesh-kanal. Du ser, hvad der er i båndet, vælger det signal, du vil gå efter, og kører eller går rundt, mens appen måler, logger og tegner kort.
+MINK er det værste akronym, vi kunne finde på: **M**esh-**IN**terferens-**K**ortlægger, hvor halvdelen af bogstaverne kommer fra samme ord. Appen er bedre end navnet.
+
+Den gør en Android-telefon og en RTL-SDR til et håndholdt instrument, der finder smalle forstyrrelser i og omkring en LoRa-mesh-kanal. Du ser, hvad der er i båndet, vælger det signal, du vil gå efter, og kører eller går rundt, mens appen måler, logger og tegner kort.
 
 > **English summary.** MINK turns an Android phone and an RTL-SDR dongle into a handheld tool for finding
 > narrowband interference in and around a LoRa mesh channel (MeshCore EU/UK narrow by default). It shows a
