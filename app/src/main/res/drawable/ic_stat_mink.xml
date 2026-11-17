@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ikonet i måletjenestens meddelelse: samme rose som app-ikonet, i én farve og uden luft omkring. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.88" android:pathData="M10.56,5.76L9.56,1.42A10.86,10.86 0 0,1 14.44,1.42L13.44,5.76A6.4,6.4 0 0,0 10.56,5.76Z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="1" android:pathData="M13.87,5.88L15.28,1.27A11.22,11.22 0 0,1 19.65,3.79L16.36,7.32A6.4,6.4 0 0,0 13.87,5.88Z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="1" android:pathData="M16.68,7.64L20.21,4.35A11.22,11.22 0 0,1 22.73,8.72L18.12,10.13A6.4,6.4 0 0,0 16.68,7.64Z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.88" android:pathData="M18.24,10.56L22.58,9.56A10.86,10.86 0 0,1 22.58,14.44L18.24,13.44A6.4,6.4 0 0,0 18.24,10.56Z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.75" android:pathData="M18.12,13.87L22.04,15.07A10.5,10.5 0 0,1 19.68,19.16L16.68,16.36A6.4,6.4 0 0,0 18.12,13.87Z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.63" android:pathData="M16.36,16.68L18.92,19.42A10.14,10.14 0 0,1 14.96,21.7L13.87,18.12A6.4,6.4 0 0,0 16.36,16.68Z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.5" android:pathData="M13.44,18.24L14.2,21.53A9.78,9.78 0 0,1 9.8,21.53L10.56,18.24A6.4,6.4 0 0,0 13.44,18.24Z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.38" android:pathData="M10.13,18.12L9.25,21.01A9.42,9.42 0 0,1 5.58,18.89L7.64,16.68A6.4,6.4 0 0,0 10.13,18.12Z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.38" android:pathData="M7.32,16.36L5.11,18.42A9.42,9.42 0 0,1 2.99,14.75L5.88,13.87A6.4,6.4 0 0,0 7.32,16.36Z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.5" android:pathData="M5.76,13.44L2.47,14.2A9.78,9.78 0 0,1 2.47,9.8L5.76,10.56A6.4,6.4 0 0,0 5.76,13.44Z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.63" android:pathData="M5.88,10.13L2.3,9.04A10.14,10.14 0 0,1 4.58,5.08L7.32,7.64A6.4,6.4 0 0,0 5.88,10.13Z" />
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.75" android:pathData="M7.64,7.32L4.84,4.32A10.5,10.5 0 0,1 8.93,1.96L10.13,5.88A6.4,6.4 0 0,0 7.64,7.32Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M15.68,8.32L12.65,13.79L10.21,11.35Z" />
+</vector>
