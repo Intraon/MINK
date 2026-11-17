@@ -25,6 +25,7 @@ import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.WindowManager
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -39,6 +40,8 @@ import dk.intraon.mink.map.MapData
 import dk.intraon.mink.map.PointsOverlay
 import dk.intraon.mink.measure.MeasureService
 import dk.intraon.mink.radio.Calibrate
+import dk.intraon.mink.replay.Replay
+import dk.intraon.mink.replay.ReplayPane
 import dk.intraon.mink.trip.JsonlLog
 import dk.intraon.mink.trip.TripFiles
 import dk.intraon.mink.trip.TripShare
@@ -112,6 +115,7 @@ class MainActivity : Activity() {
     private var trips: List<JsonlLog.Entry> = emptyList()
     private var tripIndex = -1
     private var tripsShown = 0
+    private lateinit var replayPane: ReplayPane
     private var driverOk = true
     private var dongle: Boolean? = null
     private var hwChecked = 0L
@@ -290,7 +294,7 @@ class MainActivity : Activity() {
         tripTv = tv(14f, Ui.TEXT, true).apply {
             text = "Aktuel tur"; gravity = Gravity.CENTER; setPadding(dp(10), 0, dp(10), 0)
             background = GradientDrawable().apply { setColor(0xE6202124.toInt()); cornerRadius = dp(10).toFloat() }
-            setOnClickListener { sessionsDialog() }
+            setOnClickListener { tripsDialog() }
         }
         tripBar.addView(tripTv, LinearLayout.LayoutParams(WRAP_CONTENT, dp(44)).apply { setMargins(dp(4), 0, dp(4), 0) })
         tripBar.addView(button("▶", Ui.BUTTON) { stepTrip(-1) }, LinearLayout.LayoutParams(dp(44), dp(44)))
@@ -313,6 +317,9 @@ class MainActivity : Activity() {
         waterfall = WaterfallView(this) { hz -> onWaterfallTap(hz) }
         mainBox.addView(mapBox, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         mainBox.addView(waterfall, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        // en tidligere tur som vandfald; ligger på fanen Vandfald i stedet for det levende, mens turen er åben
+        replayPane = ReplayPane(this, onPlace = { fix -> pointsLayer.cursor = fix?.let { it.lat to it.lon }; map.invalidate() }, onClose = { showOnMap(emptyList(), 0) })
+        mainBox.addView(replayPane, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         cameraPane = CameraPane(this)
         mainBox.addView(cameraPane, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         // Billede: i vandfaldet de seneste 30 sekunder som en figur, på kortet kortet, som det ses
@@ -344,8 +351,11 @@ class MainActivity : Activity() {
 
     private fun showTab(which: Int) {
         tab = which
-        waterfall.visibility = if (which == 0) View.VISIBLE else View.GONE
-        figureBtn.visibility = if (which == 0 || which == 1) View.VISIBLE else View.GONE
+        val replay = replayPane.active
+        waterfall.visibility = if (which == 0 && !replay) View.VISIBLE else View.GONE
+        replayPane.visibility = if (which == 0 && replay) View.VISIBLE else View.GONE
+        // Billede laver en figur af det levende vandfald; der er ingen for en tidligere tur
+        figureBtn.visibility = if ((which == 0 && !replay) || which == 1) View.VISIBLE else View.GONE
         mapBoxView.visibility = if (which == 1) View.VISIBLE else View.GONE
         cameraPane.visibility = if (which == 2) View.VISIBLE else View.GONE
         if (which == 2) cameraPane.open() else cameraPane.close()
@@ -565,13 +575,52 @@ class MainActivity : Activity() {
         showOnMap(if (tripIndex < 0) emptyList() else listOf(trips[tripIndex].uri))
     }
 
-    /** Lægger de valgte ture ind på kortet (ingen valgt = fjern dem igen) og zoomer, så de kan ses. */
-    private fun showOnMap(uris: List<Uri>) {
+    /**
+     * Listen over ture med længde, antal målinger og stærkeste niveau. Et tryk åbner turen: kortet viser den, og
+     * fanen Vandfald viser dens vandfald, genskabt fra loggen.
+     */
+    fun tripsDialog() {
+        val logs = JsonlLog.list(this)
+        if (logs.isEmpty()) { toast("Der er ingen ture endnu"); return }
+        val rows = logs.map { TripFiles.title(it.name) + "\nlæser …" }.toMutableList()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, rows)
+        val dlg = AlertDialog.Builder(this)
+            .setTitle("Ture")
+            .setAdapter(adapter) { _, i -> trips = logs; tripIndex = i; showOnMap(listOf(logs[i].uri), 0) }
+            .setNeutralButton("Vælg flere …") { _, _ -> sessionsDialog() }
+            .setNegativeButton("Luk", null).show()
+        Thread {
+            for ((i, e) in logs.withIndex()) {
+                if (!dlg.isShowing) break
+                val r = Replay.parse(readLines(e.uri))
+                val text = TripFiles.title(e.name) + "\n" + if (r == null) "tom" else listOfNotNull(
+                    ((r.endMs - r.startMs) / 60_000).let { if (it < 1) "under 1 min" else "$it min" },
+                    if (r.target.size == 1) "1 måling" else "${r.target.size} målinger",
+                    r.strongest?.let { "stærkest ${Ui.f1(it)} dB" },
+                ).joinToString(" · ")
+                runOnUiThread { rows[i] = text; adapter.notifyDataSetChanged() }
+            }
+        }.start()
+    }
+
+    /** En logfils linjer (kald fra en baggrundstråd). Tom, hvis filen ikke kan læses. */
+    private fun readLines(uri: Uri): List<String> =
+        try { contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readLines() } ?: emptyList() } catch (_: Exception) { emptyList() }
+
+    /**
+     * Lægger de valgte ture ind på kortet (ingen valgt = fjern dem igen), zoomer, så de kan ses, og viser fanen
+     * [thenTab]. Er der valgt netop én tur, åbnes også dens vandfald; ellers lukkes det.
+     */
+    private fun showOnMap(uris: List<Uri>, thenTab: Int = 1) {
         if (settingsView != null) closeSettings()
         tripsShown = uris.size
-        if (uris.isEmpty()) { tripIndex = -1; MapData.clear(); showTab(1); render(); return }
+        if (uris.isEmpty()) { tripIndex = -1; MapData.clear(); replayPane.close(); showTab(thenTab); render(); return }
+        val single = if (uris.size == 1) trips.getOrNull(tripIndex) else null
         Thread {
             val n = MapData.load(this, uris)
+            val replay = single?.let { Replay.parse(readLines(it.uri)) }
+            // bølgeformen hører til turen, hvis den har det navn, loggen nævner
+            val wave = replay?.iqFile?.let { name -> JsonlLog.list(this, JsonlLog.IQ_SUFFIX).firstOrNull { it.name == name } }
             runOnUiThread {
                 if (n == 0) toast("De valgte ture har ingen målinger med position")
                 val pts = MapData.bursts + MapData.silent
@@ -581,7 +630,8 @@ class MainActivity : Activity() {
                     val box = BoundingBox(lats.max() + 0.002, lons.max() + 0.004, lats.min() - 0.002, lons.min() - 0.004)
                     map.zoomToBoundingBox(box, false, dp(24))
                 }
-                showTab(1)
+                if (replay != null && single != null) replayPane.open(TripFiles.title(single.name), replay, wave?.uri) else replayPane.close()
+                showTab(thenTab)
                 render()
             }
         }.start()

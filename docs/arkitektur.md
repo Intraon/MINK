@@ -21,7 +21,7 @@ RTL-SDR ──USB──▶ "Rtl-sdr driver" (marto.rtl_tcp_andro)
                         │
                     core/Hub  (fælles tilstand + lyttere)
                         │
-              ui/MainActivity ── waterfall/, map/, direction/CameraPane, ui/SettingsScreen
+              ui/MainActivity ── waterfall/, map/, replay/ReplayPane, direction/CameraPane, ui/SettingsScreen
 ```
 
 `MeasureService` er en foreground service af typen `location` med en delvis wake lock, så målingen fortsætter med skærmen slukket. Den er `START_NOT_STICKY`: dræber telefonen processen, kan målingen ikke genoptages uden brugeren, fordi driveren skal startes fra en skærm.
@@ -38,6 +38,7 @@ Kildekoden ligger i `app/src/main/java/dk/intraon/mink/`, én mappe pr. komponen
 | `core/` | Det, alle deler: tilstanden mellem måling og skærm, brugerens indstillinger og mærkernes typer | `MarkKind` | `Hub`, `Settings` |
 | `waterfall/` | Vandfaldets data og visning, og målebilledet | `Scope`, `Figure`, `Pen` | `WaterfallView`, `CanvasPen`, `FigureExport` |
 | `map/` | Kortlaget, turens spor, varmekortet og tidligere ture på kortet | `Track`, `HeatGrid`, `TripPoints` | `PointsOverlay`, `MapData`, `MapExport` |
+| `replay/` | En tidligere tur som vandfald, genskabt fra log og bølgeform | `Replay`, `ClipSpectrum` | `IqClips`, `ReplayView`, `ReplayPane` |
 | `direction/` | Retningsantenne: retninger, roset, kompas og kameraskærm | `Bearing`, `Rose`, `CompassCheck`, `HeadingFilter`, `FlatLayout` | `Compass`, `CameraPane` |
 | `trip/` | Turens filer: log, bølgeform, hvilke filer der hører til en tur, og deling | `TripFiles`, `ZipPack` | `JsonlLog`, `IqWav`, `Export`, `TripShare` |
 | `update/` | Opdatering fra GitHub-udgivelser | `Releases` | `Updater` |
@@ -99,7 +100,7 @@ Workflowet **Byg og test** (`.github/workflows/ci.yml`) kører det samme byggesc
 
 ## Test
 
-`sh tools/build.sh` kører alle unittests (`./gradlew testReleaseUnitTest`). Testene dækker den rene Kotlin: detektoren, ringlageret, gain-reglerne, senderlisten, frekvensrettelsen, vandfaldets data, turens spor, varmekortet, retningsregningen, tur-filerne og udgivelseslæseren. Der er én test pr. regel, appen skal overholde, ikke én pr. funktion.
+`sh tools/build.sh` kører alle unittests (`./gradlew testReleaseUnitTest`). Testene dækker den rene Kotlin: detektoren, ringlageret, gain-reglerne, senderlisten, frekvensrettelsen, vandfaldets data, turens spor, varmekortet, genlæsningen af en tur, retningsregningen, tur-filerne og udgivelseslæseren. Der er én test pr. regel, appen skal overholde, ikke én pr. funktion.
 
 Skærme, kamera, kompas, deling og installation kan kun prøves på en telefon.
 

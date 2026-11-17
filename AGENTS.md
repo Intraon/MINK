@@ -37,6 +37,7 @@ Bygget kræver JDK 17+ og henter selv Android SDK'et første gang. Der er ingen 
 | `core/` | `Hub` (tilstanden mellem måling og skærm) og `Settings` |
 | `waterfall/` | Vandfaldet og målebilledet |
 | `map/` | Kortlag, varmekort, tidligere ture |
+| `replay/` | En tidligere tur som vandfald |
 | `direction/` | Retninger, roset, kompas, kameraskærm |
 | `trip/` | Log, bølgeform, tur-filer, deling |
 | `update/` | Opdatering fra GitHub |

@@ -51,7 +51,19 @@ Går du samme vej to gange, ligger den stærkeste måling øverst. Din krop, en 
 
 - **▦** skifter til varmekortet: målingerne samles i felter, hvis størrelse følger zoom, fra 25 m og op. Det stærkeste felt får en hvid ramme med sit niveau. Der gættes ikke mellem felterne; hvor du ikke har været, er kortet tomt.
 - **◉** følger din position.
-- **◀ og ▶** bladrer gennem tidligere ture. Tryk på turens navn imellem dem for at vælge flere på én gang.
+- **◀ og ▶** bladrer gennem tidligere ture. Tryk på turens navn imellem dem for at få listen over ture.
+
+## Se en tur igen
+
+Listen **Ture** (tryk på turens navn på kortet, eller under ⚙) viser hver tur med dato, længde, antal målinger og det stærkeste niveau. Tryk på en tur for at åbne den: kortet viser turen, og fanen **Vandfald** viser turens vandfald i stedet for det levende. **Vælg flere …** lægger flere ture på kortet på én gang eller deler dem.
+
+Vandfaldet er genskabt fra turens log. Hvert udbrud står på sin frekvens og sit klokkeslæt med sin bredde og varighed, for alle de sendere, der blev hørt. Støjen mellem udbruddene blev ikke gemt, så dér er vandfaldet tomt.
+
+- Træk i vandfaldet for at gå frem og tilbage i tiden. Det seneste er øverst, som i det levende vandfald.
+- Kurven øverst er målets niveau over hele turen. Tryk et sted på den for at springe derhen.
+- Knappen med afstanden skifter mellem **overblik** (fem minutter på en skærm), **normal** (som det levende vandfald) og **tæt på** (et udbrud fylder en finger). I normal og tæt på vises udbruddets ægte signal fra turens bølgeform; uden bølgeform er hvert udbrud et felt farvet efter styrken.
+- På kortet viser et sigtekorn, hvor du var på det klokkeslæt, vandfaldet står på.
+- **✕** lukker turen og viser det levende vandfald igen.
 
 ## Donglens frekvens
 

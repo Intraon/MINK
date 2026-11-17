@@ -36,6 +36,8 @@ class PointsOverlay(private val d: Float) : Overlay() {
      * Ellers tegnes de indlæste ture sammen med den tur, der kører.
      */
     var only: TripPoints? = null
+    /** Sat: et sted (bredde, længde), der fremhæves med et sigtekorn – dér, hvor en tidligere turs vandfald står. */
+    var cursor: Pair<Double, Double>? = null
     /** Tekst til forklaringen under kortet; sættes hver gang varmekortet tegnes. */
     @Volatile var heatLegend = ""
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -213,6 +215,17 @@ class PointsOverlay(private val d: Float) : Overlay() {
         for (list in marks()) for (m in list) {
             px(mv, m.lat ?: continue, m.lon ?: continue)
             drawMark(c, pt.x.toFloat(), pt.y.toFloat(), m)
+        }
+        cursor?.let { (lat, lon) ->
+            px(mv, lat, lon)
+            val x = pt.x.toFloat(); val y = pt.y.toFloat()
+            p.style = Paint.Style.STROKE
+            for ((width, color) in listOf(5f to 0xFF202124.toInt(), 2.5f to 0xFFFFFFFF.toInt())) {
+                p.strokeWidth = width * d; p.color = color
+                c.drawCircle(x, y, 11 * d, p)
+                c.drawLine(x - 20 * d, y, x - 11 * d, y, p); c.drawLine(x + 11 * d, y, x + 20 * d, y, p)
+                c.drawLine(x, y - 20 * d, x, y - 11 * d, p); c.drawLine(x, y + 11 * d, x, y + 20 * d, p)
+            }
         }
         if (only != null) return
         val me = Hub.location ?: return
