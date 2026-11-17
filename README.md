@@ -1,3 +1,5 @@
+<img src="docs/billeder/ikon.png" width="96" align="right" alt="MINK's ikon: en kompasrose farvet efter signalstyrke">
+
 # MINK – Mesh-INterferens-Kortlægger
 
 MINK er det værste akronym, vi kunne finde på: **M**esh-**IN**terferens-**K**ortlægger, hvor halvdelen af bogstaverne kommer fra samme ord. Appen er bedre end navnet.
@@ -9,6 +11,18 @@ Den gør en Android-telefon og en RTL-SDR til et håndholdt instrument, der find
 > waterfall, tracks the signal you pick, logs every burst with GPS position, draws a heat map, saves the waveform
 > (IQ) for later analysis, and supports a directional antenna with compass bearings and a camera overlay.
 > The user interface, code comments and documentation are in Danish. MIT licensed.
+
+<p align="center">
+  <img src="docs/billeder/vandfald.png" width="270" alt="Hovedskærmen: styrke, graf og vandfald, hvor et smalt signal i kanalen er valgt som mål">
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/billeder/pejling.png" width="270" alt="Retningsantenne med telefonen fladt: kompasrose farvet efter signalets styrke">
+</p>
+
+<p align="center">
+  <img src="docs/billeder/maalebillede.png" width="760" alt="Målebillede: spektrum over 30 sekunder med et smalt signal hvert fjerde sekund">
+</p>
+
+<p align="center"><sub>Skærmbillederne er lavet med appens egen kode og simulerede signaler.</sub></p>
 
 ## Hvad den kan
 
