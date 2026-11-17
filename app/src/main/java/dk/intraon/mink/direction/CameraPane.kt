@@ -306,9 +306,9 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
         private fun paintFlat(c: Canvas, w: Int, h: Int, hdg: Double, now: Long) {
             val cx = w / 2f
             c.drawColor(0xFF0E0F12.toInt())
-            val top = 64 * d
-            val rr = minOf(w * 0.40f, (h - top - 96 * d) / 2f).coerceAtLeast(40 * d)
-            val cy = top + rr + 18 * d
+            val lay = FlatLayout(w.toFloat(), h.toFloat(), d)
+            val rr = lay.radius
+            val cy = lay.centerY
             val rose = Hub.rose
             val range = rose.range()
             // rosen drejes, så verden står stille, mens telefonen drejer: nord peger mod nord
@@ -341,10 +341,10 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
             c.drawPath(tip, p)
             p.textSize = 13 * d
             val best = rose.best()
-            c.drawText(if (best != null) "▼ stærkest ${best.roundToInt()}° ${Bearing.name(best)}" else "drej langsomt rundt – ét udbrud pr. retning", cx, cy + rr + 26 * d, p)
+            c.drawText(if (best != null) "▼ stærkest ${best.roundToInt()}° ${Bearing.name(best)}" else "drej langsomt rundt – ét udbrud pr. retning", cx, lay.bestY, p)
             val n = Hub.bearings.size
-            p.textAlign = Paint.Align.LEFT; p.color = 0xB0FFFFFF.toInt()
-            c.drawText(if (n == 0) "ingen pejlinger gemt" else "$n ${if (n == 1) "pejling" else "pejlinger"} gemt", 12 * d, h - 78 * d, p)
+            p.textAlign = Paint.Align.LEFT; p.color = 0xB0FFFFFF.toInt(); p.textSize = 12 * d
+            c.drawText(if (n == 0) "ingen pejlinger gemt" else "$n ${if (n == 1) "pejling" else "pejlinger"} gemt", 12 * d, lay.countY, p)
             header(c, w, hdg, now, if (Hub.compassPoor) "Kompasset viser forkert – tryk Kalibrér kompas" else null, "telefonens top")
         }
 
