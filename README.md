@@ -15,6 +15,16 @@ Baggrunden står i artiklen [MINK finder forstyrrelser på en mesh-kanal](https:
 > The user interface, code comments and documentation are in Danish. MIT licensed.
 
 <p align="center">
+  <a href="https://intraon.dk/video/mink/vandfald.mp4"><img src="https://intraon.dk/media/mink/vandfald.webp" width="230" alt="Video: vandfaldet under en tur, med et smalt signal hvert fjerde sekund i kanalen"></a>
+  &nbsp;&nbsp;
+  <a href="https://intraon.dk/video/mink/kort.mp4"><img src="https://intraon.dk/media/mink/kort.webp" width="230" alt="Video: kortet under en tur, hvor ruten farves efter signalets styrke"></a>
+  &nbsp;&nbsp;
+  <a href="https://intraon.dk/video/mink/kamera.mp4"><img src="https://intraon.dk/media/mink/kamera.webp" width="230" alt="Video: kameraskærmen, mens telefonen drejes rundt, og hver retning farves efter styrken"></a>
+</p>
+
+<p align="center"><sub>▶ Tryk på et billede for at se videoen: vandfaldet, kortet og kameraet, optaget på en tur med appen. Videoerne ligger på <a href="https://intraon.dk/nyheder/mink">intraon.dk</a>.</sub></p>
+
+<p align="center">
   <img src="docs/billeder/vandfald.png" width="270" alt="Hovedskærmen: styrke, graf og vandfald, hvor et smalt signal i kanalen er valgt som mål">
   &nbsp;&nbsp;&nbsp;
   <img src="docs/billeder/pejling.png" width="270" alt="Retningsantenne med telefonen fladt: kompasrose farvet efter signalets styrke">
