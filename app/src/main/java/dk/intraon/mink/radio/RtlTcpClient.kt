@@ -29,6 +29,8 @@ class RtlTcpClient(
         )
         val TUNERS = mapOf(1 to "E4000", 2 to "FC0012", 3 to "FC0013", 4 to "FC2580", 5 to "R820T", 6 to "R828D")
         const val MAX_TRIES = 30
+        /** Så længe venter [stop] højst på, at læsetråden bliver færdig med den blok, den er i gang med. */
+        const val STOP_WAIT_MS = 500L
     }
 
     @Volatile private var socket: Socket? = null
@@ -49,11 +51,18 @@ class RtlTcpClient(
         thread = Thread({ run(freqHz, rate, ppm, gainDb) }, "rtl_tcp").apply { start() }
     }
 
+    /**
+     * Stopper forbindelsen og venter på læsetråden, så [onBlock] ikke kører og ikke bliver kaldt igen, når [stop]
+     * er vendt tilbage. Den, der stopper, kan derfor lukke filer eller starte en ny forbindelse med samme
+     * modtager uden at dele den med den gamle tråd. Kaldt fra læsetråden selv ventes der ikke.
+     */
     fun stop() {
         running = false
         try { socket?.close() } catch (_: Exception) {}
-        thread?.interrupt()
+        val t = thread
+        t?.interrupt()
         writer.shutdown()
+        if (t != null && t !== Thread.currentThread()) try { t.join(STOP_WAIT_MS) } catch (_: InterruptedException) {}
     }
 
     @Synchronized
@@ -77,10 +86,12 @@ class RtlTcpClient(
             try {
                 onState(State.CONNECTING, "Forbinder til driveren")
                 val s = Socket()
+                // stop() skal kunne lukke socket'en, også mens den forbinder
+                socket = s
+                if (!running) break
                 s.connect(InetSocketAddress(host, port), 3000)
                 s.soTimeout = 5000
                 s.receiveBufferSize = 1 shl 20
-                socket = s
                 out = s.getOutputStream()
                 val inp = DataInputStream(s.getInputStream().buffered(1 shl 18))
 
@@ -110,6 +121,8 @@ class RtlTcpClient(
                 while (running) {
                     inp.readFully(buf, pre, blockBytes - pre)
                     pre = 0
+                    // en blok, der blev læst færdig, mens der blev stoppet, afleveres ikke
+                    if (!running) break
                     onBlock(buf, System.currentTimeMillis())
                 }
             } catch (e: Exception) {
@@ -126,6 +139,8 @@ class RtlTcpClient(
                 try { Thread.sleep(1000) } catch (_: InterruptedException) { break }
             }
         }
+        out = null
+        try { socket?.close() } catch (_: Exception) {}
     }
 
     /** Senest satte gain, så en genforbindelse fortsætter, hvor den slap. */

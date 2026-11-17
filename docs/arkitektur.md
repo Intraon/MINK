@@ -54,8 +54,9 @@ Afhængighederne går nedad i dataflowet: `dsp/` kender ingen andre, `radio/` ke
 | `rtl_tcp-cmd` (i `RtlTcpClient`) | Sender kommandoer til driveren (gain, PPM). Android afviser netværk på hovedtråden |
 | `mink-tick` | Periodens opgørelse hvert 10. sekund, og GPS-opdateringer |
 | `uploader` | Sender til webhooken |
-| `mink-kamera` | Kameraets tilbagekald |
-| Hovedtråden | Skærmen. Den læser `Hub` og får besked gennem `Hub.changed()` |
+| Hovedtråden | Skærmen. Den læser `Hub` og får besked gennem `Hub.changed()`. Kameraets tilbagekald kommer også her |
+
+`RtlTcpClient.stop()` venter på læsetråden (højst et halvt sekund), så ingen blok er under behandling, når måletjenesten lukker log og bølgeform eller starter en ny forbindelse.
 
 `Hub` er den eneste kanal mellem måling og skærm. Felterne er `@Volatile` eller trådsikre lister; skærmen ændrer aldrig måletilstanden direkte, men sender en handling til `MeasureService` (`MeasureService.send`, `sendGain`, `sendPpm`, `sendTarget`, `sendBearing`).
 
