@@ -277,7 +277,7 @@ class MainActivity : Activity() {
         mapBox.addView(map, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         followBtn = button("◉", Ui.BUTTON) { follow = true; updateFollow(); render() }
         mapBox.addView(followBtn, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP or Gravity.END).apply { setMargins(dp(8), dp(8), dp(8), dp(8)) })
-        // skifter mellem punkter og varmekort
+        // skifter mellem spor og varmekort
         heatBtn = button("▦", Ui.BUTTON) {
             pointsLayer.heat = !pointsLayer.heat
             heatBtn.setTextColor(if (pointsLayer.heat) Ui.ACCENT else Ui.TEXT)
@@ -582,7 +582,7 @@ class MainActivity : Activity() {
                     map.zoomToBoundingBox(box, false, dp(24))
                 }
                 showTab(1)
-                if (!pointsLayer.heat) heatBtn.performClick() else render()
+                render()
             }
         }.start()
     }
