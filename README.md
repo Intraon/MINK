@@ -25,16 +25,10 @@ Baggrunden står i artiklen [MINK finder forstyrrelser på en mesh-kanal](https:
 <p align="center"><sub>▶ Tryk på et billede for at se videoen: vandfaldet, kortet og kameraet, optaget på en tur med appen. Videoerne ligger på <a href="https://intraon.dk/nyheder/mink">intraon.dk</a>.</sub></p>
 
 <p align="center">
-  <img src="docs/billeder/vandfald.png" width="270" alt="Hovedskærmen: styrke, graf og vandfald, hvor et smalt signal i kanalen er valgt som mål">
-  &nbsp;&nbsp;&nbsp;
-  <img src="docs/billeder/pejling.png" width="270" alt="Retningsantenne med telefonen fladt: kompasrose farvet efter signalets styrke">
-</p>
-
-<p align="center">
   <img src="docs/billeder/maalebillede.png" width="760" alt="Målebillede: spektrum over 30 sekunder med et smalt signal hvert fjerde sekund">
 </p>
 
-<p align="center"><sub>Skærmbillederne er lavet med appens egen kode og simulerede signaler.</sub></p>
+<p align="center"><sub>Målebilledet er lavet med appens egen kode og simulerede signaler.</sub></p>
 
 ## Hvad den kan
 
