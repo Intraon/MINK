@@ -71,7 +71,9 @@ Slå **Jeg har en retningsantenne** til under ⚙. Så gemmer appen, hvilken vej
 
 **Fladt**, med kameraet mod jorden, slukker appen kameraet og viser en stor kompasrose. Så er det telefonens øverste kant, der skal pege samme vej som antennen. Nogle telefoners kompas er mest præcist sådan.
 
-**Tag pejling** gemmer et foto med retning og styrke i galleriet og en streg på kortet. To-tre pejlinger fra forskellige steder krydser hinanden ved senderen. **Mål** vælger målet uden at gå tilbage til vandfaldet.
+**Tag pejling** gemmer et foto med retning og styrke i galleriet og en streg på kortet. To-tre pejlinger fra forskellige steder krydser hinanden ved senderen.
+
+Appen gemmer også selv en pejling for hvert sted, hvor du har drejet mindst en halv omgang rundt: stregen peger i den retning, rosen fandt stærkest, og fotoet er kamerabilledet fra stedets stærkeste måling. Det sker, når du går mere end 15 m videre, forlader fanen Kamera eller stopper målingen. Hvert sted gemmes én gang. **Mål** vælger målet uden at gå tilbage til vandfaldet.
 
 Det skal du vide:
 

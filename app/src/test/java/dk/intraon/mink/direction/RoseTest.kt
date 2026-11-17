@@ -26,4 +26,39 @@ class RoseTest {
         assertEquals(1, r.filled())
         assertEquals(56.0005, r.lat, 1e-9)
     }
+
+    /** En omgang rundt på samme sted: en måling for hver 10°, stærkest mod [toward], kroppen skygger modsat. */
+    private fun turn(r: Rose, toward: Double, lat: Double, t0: Long, from: Int = 0, until: Int = 360) {
+        for (d in from until until step 10) {
+            r.add(d + 5.0, -62.0 - 22 * (1 - Math.cos(Math.toRadians(d + 5.0 - toward))) / 2, lat, 9.0, t = t0 + d * 400L)
+        }
+    }
+
+    @Test fun stedetsStaerkesteRetningAfleveresNaarManGaarVidere() {
+        val r = Rose()
+        turn(r, 185.0, 56.0, 1_000L)
+        val left = r.add(190.0, -70.0, 56.0005, 9.0, t = 200_000L)!!     // 55 m væk
+        assertEquals(185.0, left.best, 6.0)
+        assertEquals(-62.0, left.level, 0.01)
+        assertEquals(1_000L + 180 * 400L, left.at)
+        assertEquals(56.0, left.lat, 1e-9)
+        assertEquals(36, left.rose.filled())
+        assertEquals("rosen er begyndt forfra på det nye sted", 1, r.filled())
+    }
+
+    @Test fun etStedUdenEnHalvOmgangGiverIngenPejling() {
+        // man går med telefonen fremme: nogle få retninger pr. sted
+        val r = Rose()
+        turn(r, 185.0, 56.0, 0L, from = 150, until = 230)
+        assertNull(r.finish())
+        assertNull(r.add(190.0, -70.0, 56.0005, 9.0))
+    }
+
+    @Test fun etStedAfleveresKunEnGang() {
+        val r = Rose()
+        turn(r, 185.0, 56.0, 0L)
+        assertEquals(185.0, r.finish()!!.best, 6.0)
+        assertNull(r.finish())
+        assertNull("heller ikke, når man går videre", r.add(190.0, -70.0, 56.0005, 9.0))
+    }
 }

@@ -110,7 +110,8 @@ Felterne i `bearing`:
 | `cmp` | `ok` eller `poor`: om kompasset var til at stole på |
 | `ut` | Det målte magnetfelt i µT |
 | `flat` | `true`, hvis retningen er telefonens øverste kant; ellers er det kameraets |
-| `photo` | Fotoets sti i galleriet |
+| `photo` | Fotoets sti i galleriet; `null` uden foto |
+| `auto` | `true`, hvis appen selv gemte pejlingen for et sted, hvor der var målt mindst en halv omgang rundt, da brugeren gik videre, forlod kameraskærmen eller stoppede målingen. Så er `lat` og `lon` stedet, `hdg` og `best` stedets stærkeste retning og `lvl` stedets stærkeste måling, og `tilt`, `snr`, `cmp`, `ut`, `flat`, `acc` og `spd` mangler. Feltet mangler i en pejling, brugeren selv tog |
 
 ## Bølgeform-filen
 
