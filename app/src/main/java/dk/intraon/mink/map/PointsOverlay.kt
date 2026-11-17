@@ -1,9 +1,11 @@
 package dk.intraon.mink.map
 
 import android.graphics.Canvas
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Point
+import android.graphics.Shader
 import dk.intraon.mink.core.Hub
 import dk.intraon.mink.core.MarkKind
 import dk.intraon.mink.direction.Bearing
@@ -13,15 +15,19 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.Overlay
 
+/** Så lang tegnes en pejling på kortet (meter). */
+private const val BEARING_M = 3_000.0
+/** Farven på spor og felter, hvor der blev lyttet uden at høre målet. */
+private const val QUIET = 0xFF808891.toInt()
+
 /**
  * Målingerne på kortet. To visninger:
- * - punkter: en farvet prik pr. måling, små grå hvor der var stille
+ * - spor: turen som en linje, farvet glidende efter niveauet fra måling til måling og grå, hvor der var stille.
+ *   Den stærkeste måling får en hvid ring med sit niveau.
  * - varmekort ([heat]): målingerne samlet i felter, farvet efter feltets gennemsnitlige niveau; det stærkeste
  *   felt får en hvid ramme. Grå felter = lyttet, intet hørt.
  * Begge viser den tur, der kører, sammen med de tidligere ture, der er lagt ind (MapData).
  */
-/** Så lang tegnes en pejling på kortet (meter). */
-private const val BEARING_M = 3_000.0
 
 class PointsOverlay(private val d: Float) : Overlay() {
     var heat = false
@@ -38,9 +44,11 @@ class PointsOverlay(private val d: Float) : Overlay() {
     private val gp = GeoPoint(0.0, 0.0)
     private var grid: HeatGrid? = null
     private var gridStamp = -1L
+    private var pieces: List<Track.Piece> = emptyList()
+    private var piecesStamp = -1L
 
     override fun draw(c: Canvas, mv: Projection) {
-        if (heat) drawHeat(c, mv) else drawPoints(c, mv)
+        if (heat) drawHeat(c, mv) else drawTrack(c, mv)
         drawMarksAndMe(c, mv)
     }
 
@@ -53,22 +61,57 @@ class PointsOverlay(private val d: Float) : Overlay() {
     private fun marks() = only?.let { listOf(it.marks) } ?: listOf(MapData.marks, Hub.marks)
     private fun bearings() = only?.let { listOf(it.bearings) } ?: listOf(MapData.bearings, Hub.bearings)
 
-    private fun drawPoints(c: Canvas, mv: Projection) {
-        p.style = Paint.Style.FILL
-        p.color = 0xCC6B7078.toInt()
-        for (list in silent()) for (s in list) {
-            px(mv, s.lat ?: continue, s.lon ?: continue)
-            c.drawCircle(pt.x.toFloat(), pt.y.toFloat(), 3 * d, p)
-        }
+    /** Ændrer sig, når der er kommet målinger til eller andre ture er lagt ind. */
+    private fun stamp() = bursts().sumOf { it.size } * 7L + silent().sumOf { it.size } * 5L + MapData.sessions * 1_000_003L
+
+    private fun drawTrack(c: Canvas, mv: Projection) {
+        val stamp = stamp()
+        if (stamp != piecesStamp) { pieces = Track.pieces((bursts() + silent()).flatten()); piecesStamp = stamp }
         val o = only
         val range = if (o != null) o.range() else MapData.range()
-        for (list in bursts()) for (b in list) {
-            px(mv, b.lat ?: continue, b.lon ?: continue)
-            p.style = Paint.Style.FILL; p.color = Hub.colorFor(b.level ?: continue, range)
-            c.drawCircle(pt.x.toFloat(), pt.y.toFloat(), 7 * d, p)
-            p.style = Paint.Style.STROKE; p.strokeWidth = d; p.color = 0xFF202124.toInt()
-            c.drawCircle(pt.x.toFloat(), pt.y.toFloat(), 7 * d, p)
+        p.style = Paint.Style.STROKE; p.strokeCap = Paint.Cap.ROUND
+
+        // en mørk kant under hele sporet, så farverne står klart på kortet, også hvor sporet krydser sig selv
+        p.strokeWidth = 9 * d; p.color = 0xFF202124.toInt()
+        for (q in pieces) line(c, mv, q)
+        p.strokeWidth = 6 * d
+        for (q in pieces) {
+            val from = q.from.level?.let { Hub.colorFor(it, range) } ?: QUIET
+            val to = q.to.level?.let { Hub.colorFor(it, range) } ?: QUIET
+            px(mv, q.from.lat ?: continue, q.from.lon ?: continue); px(mv, q.to.lat ?: continue, q.to.lon ?: continue, pt2)
+            // et kort stykke ser ens ud med og uden farveovergang
+            val visible = kotlin.math.abs(pt2.x - pt.x) + kotlin.math.abs(pt2.y - pt.y) > 6 * d
+            if (from != to && visible) p.shader = LinearGradient(pt.x.toFloat(), pt.y.toFloat(), pt2.x.toFloat(), pt2.y.toFloat(), from, to, Shader.TileMode.CLAMP)
+            else p.color = if ((q.to.level ?: -Double.MAX_VALUE) > (q.from.level ?: -Double.MAX_VALUE)) to else from
+            line(c, mv, q)
+            p.shader = null
         }
+        p.strokeCap = Paint.Cap.BUTT
+
+        val best = bursts().flatten().filter { it.lat != null && it.lon != null && it.level != null }.maxByOrNull { it.level!! } ?: return
+        px(mv, best.lat!!, best.lon!!)
+        val x = pt.x.toFloat(); val y = pt.y.toFloat()
+        p.style = Paint.Style.STROKE; p.strokeWidth = 3 * d; p.color = 0xFFFFFFFF.toInt()
+        c.drawCircle(x, y, 9 * d, p)
+        label(c, "stærkest ${Ui.f1(best.level!!)} dB", x, y - 15 * d)
+    }
+
+    /** Tegner et stykke af sporet med den pensel, der er sat; et sted uden naboer bliver en prik. */
+    private fun line(c: Canvas, mv: Projection, q: Track.Piece) {
+        px(mv, q.from.lat ?: return, q.from.lon ?: return)
+        if (q.from === q.to) { c.drawPoint(pt.x.toFloat(), pt.y.toFloat(), p); return }
+        px(mv, q.to.lat ?: return, q.to.lon ?: return, pt2)
+        c.drawLine(pt.x.toFloat(), pt.y.toFloat(), pt2.x.toFloat(), pt2.y.toFloat(), p)
+    }
+
+    /** Hvid tekst på mørk bund, midt over [x] med grundlinjen i [y]. */
+    private fun label(c: Canvas, text: String, x: Float, y: Float) {
+        p.style = Paint.Style.FILL; p.textSize = 14 * d
+        val w = p.measureText(text); val tx = x - w / 2
+        p.color = 0xD00E0F12.toInt()
+        c.drawRect(tx - 4 * d, y - 15 * d, tx + w + 4 * d, y + 4 * d, p)
+        p.color = 0xFFFFFFFF.toInt()
+        c.drawText(text, tx, y, p)
     }
 
     private fun drawHeat(c: Canvas, mv: Projection) {
@@ -78,7 +121,7 @@ class PointsOverlay(private val d: Float) : Overlay() {
         val mpp = 11_120.0 / max(1, kotlin.math.abs(pt2.y - pt.y))
         val size = HeatGrid.sizeFor(mpp * 26 * d)
 
-        val stamp = bursts().sumOf { it.size } * 7L + silent().sumOf { it.size } * 5L + MapData.sessions * 1_000_003L
+        val stamp = stamp()
         var g = grid
         if (g == null || g.sizeM != size || stamp != gridStamp) {
             val first = (bursts() + silent()).firstNotNullOfOrNull { list -> list.firstOrNull { it.lat != null } }
@@ -97,7 +140,7 @@ class PointsOverlay(private val d: Float) : Overlay() {
             px(mv, b[0], b[1]); px(mv, b[2], b[3], pt2)
             if (pt2.x < 0 || pt.x > mv.width || pt.y < 0 || pt2.y > mv.height) continue
             val m = cell.mean
-            p.color = if (m == null) 0x70808891 else (Hub.colorFor(m, range) and 0x00FFFFFF) or 0xB0000000.toInt()
+            p.color = if (m == null) (QUIET and 0x00FFFFFF) or 0x70000000 else (Hub.colorFor(m, range) and 0x00FFFFFF) or 0xB0000000.toInt()
             c.drawRect(pt.x.toFloat(), pt2.y.toFloat(), pt2.x.toFloat(), pt.y.toFloat(), p)
         }
         if (best != null) {
@@ -105,13 +148,7 @@ class PointsOverlay(private val d: Float) : Overlay() {
             px(mv, b[0], b[1]); px(mv, b[2], b[3], pt2)
             p.style = Paint.Style.STROKE; p.strokeWidth = 3 * d; p.color = 0xFFFFFFFF.toInt()
             c.drawRect(pt.x.toFloat(), pt2.y.toFloat(), pt2.x.toFloat(), pt.y.toFloat(), p)
-            p.style = Paint.Style.FILL; p.textSize = 14 * d
-            val label = "stærkest ${Ui.f1(best.second)} dB"
-            val tx = (pt.x + pt2.x) / 2f - p.measureText(label) / 2; val ty = pt2.y - 6 * d
-            p.color = 0xD00E0F12.toInt()
-            c.drawRect(tx - 4 * d, ty - 15 * d, tx + p.measureText(label) + 4 * d, ty + 4 * d, p)
-            p.color = 0xFFFFFFFF.toInt()
-            c.drawText(label, tx, ty, p)
+            label(c, "stærkest ${Ui.f1(best.second)} dB", (pt.x + pt2.x) / 2f, pt2.y - 6 * d)
         }
         val sizeTxt = if (size >= 1000) "${(size / 1000).toInt()} km" else "${size.toInt()} m"
         heatLegend = if (range == null) "ingen målinger med position endnu"
