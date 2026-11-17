@@ -6,7 +6,7 @@ En tur giver op til tre slags filer på telefonen:
 |---|---|
 | `Download/mink/mink_<tid>.jsonl.txt` | Loggen: én JSON-post pr. linje |
 | `Download/mink/mink_<tid>.iq.wav` | Bølgeformen: IQ-udsnit af hver måling |
-| `Pictures/MINK/MINK_<tid>.png` og `MINK_pejling_<tid>.jpg` | Målebilleder og pejlingsfotos |
+| `Pictures/MINK/MINK_<tid>.png`, `MINK_kort_<tid>.png` (`MINK_kort_<tur>_<tid>.png` for et billede af en tidligere tur, `MINK_kort_<tur>.png` for kortet, der laves ved deling) og `MINK_pejling_<tid>.jpg` | Målebilleder, kortbilleder og pejlingsfotos |
 
 `<tid>` er turens start som `yyyyMMdd_HHmmss`. Et billede hører til den tur, det er taget under: dets eget tidsstempel ligger efter turens start og før den næste turs.
 

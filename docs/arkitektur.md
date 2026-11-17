@@ -37,7 +37,7 @@ Kildekoden ligger i `app/src/main/java/dk/intraon/mink/`, én mappe pr. komponen
 | `measure/` | Selve målingen og det, den sætter i gang | `Beeper.toneHz` | `MeasureService`, `Uploader`, `Beeper` |
 | `core/` | Det, alle deler: tilstanden mellem måling og skærm, og brugerens indstillinger | – | `Hub`, `Settings` |
 | `waterfall/` | Vandfaldets data og visning, og målebilledet | `Scope`, `Figure`, `Pen` | `WaterfallView`, `CanvasPen`, `FigureExport` |
-| `map/` | Kortlaget, varmekortet og tidligere ture på kortet | `HeatGrid` | `PointsOverlay`, `MapData` |
+| `map/` | Kortlaget, varmekortet og tidligere ture på kortet | `HeatGrid`, `TripPoints` | `PointsOverlay`, `MapData`, `MapExport` |
 | `direction/` | Retningsantenne: retninger, roset, kompas og kameraskærm | `Bearing`, `Rose`, `CompassCheck`, `HeadingFilter`, `FlatLayout` | `Compass`, `CameraPane` |
 | `trip/` | Turens filer: log, bølgeform, hvilke filer der hører til en tur, og deling | `TripFiles`, `ZipPack` | `JsonlLog`, `IqWav`, `Export`, `TripShare` |
 | `update/` | Opdatering fra GitHub-udgivelser | `Releases` | `Updater` |

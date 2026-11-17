@@ -30,6 +30,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import dk.intraon.mink.map.MapExport
 import dk.intraon.mink.core.Hub
 import dk.intraon.mink.core.Settings
 import dk.intraon.mink.direction.CameraPane
@@ -47,6 +48,8 @@ import dk.intraon.mink.waterfall.WaterfallView
 import java.io.File
 import kotlin.math.max
 import kotlin.math.roundToInt
+import java.text.SimpleDateFormat
+import java.util.Date
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
@@ -311,8 +314,8 @@ class MainActivity : Activity() {
         mainBox.addView(waterfall, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         cameraPane = CameraPane(this)
         mainBox.addView(cameraPane, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
-        // Billede: de seneste 30 sekunder af vandfaldet som en figur, man kan sende videre
-        figureBtn = button("Billede", 0xE6202124.toInt()) { shareFigure() }.apply { textSize = 13f; setPadding(dp(12), 0, dp(12), 0) }
+        // Billede: i vandfaldet de seneste 30 sekunder som en figur, på kortet kortet, som det ses
+        figureBtn = button("Billede", 0xE6202124.toInt()) { if (tab == 1) saveMapPicture() else shareFigure() }.apply { textSize = 13f; setPadding(dp(12), 0, dp(12), 0) }
         mainBox.addView(figureBtn, FrameLayout.LayoutParams(WRAP_CONTENT, dp(36), Gravity.BOTTOM or Gravity.END).apply { setMargins(dp(8), dp(8), dp(8), dp(34)) })
         col.addView(mainBox, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
         showTab(0)
@@ -341,7 +344,7 @@ class MainActivity : Activity() {
     private fun showTab(which: Int) {
         tab = which
         waterfall.visibility = if (which == 0) View.VISIBLE else View.GONE
-        figureBtn.visibility = if (which == 0) View.VISIBLE else View.GONE
+        figureBtn.visibility = if (which == 0 || which == 1) View.VISIBLE else View.GONE
         mapBoxView.visibility = if (which == 1) View.VISIBLE else View.GONE
         cameraPane.visibility = if (which == 2) View.VISIBLE else View.GONE
         if (which == 2) cameraPane.open() else cameraPane.close()
@@ -487,6 +490,25 @@ class MainActivity : Activity() {
             val uri = FigureExport.save(this)
             runOnUiThread {
                 toast(if (uri == null) "Billedet kunne ikke gemmes" else "Billedet er gemt i galleriet (${FigureExport.DIR})")
+            }
+        }.start()
+    }
+
+    /**
+     * Gemmer kortet, som det ses lige nu, som PNG i galleriet. Billedet følger med, når turen deles: den tur, kortet
+     * viser, hvis det er én tidligere tur, og ellers den nyeste.
+     */
+    private fun saveMapPicture() {
+        val now = Date()
+        val target = Hub.targetHz?.let { " · mål ${Ui.mhz(it)} MHz" } ?: ""
+        val caption = "MINK · ${SimpleDateFormat("d.M.yyyy HH:mm", Ui.DA).format(now)} · ${tripTv.text}$target"
+        val bmp = MapExport.capture(map, legendTv, caption, resources.displayMetrics.density)
+        if (bmp == null) { toast("Kortet er ikke klar endnu"); return }
+        val shown = if (MapData.sessions == 1 && tripIndex in trips.indices) TripFiles.stamp(trips[tripIndex].name) else null
+        Thread {
+            val saved = MapExport.save(this, bmp, TripFiles.mapPictureName(SimpleDateFormat("yyyyMMdd_HHmmss", Ui.DA).format(now), shown))
+            runOnUiThread {
+                toast(if (saved == null) "Billedet kunne ikke gemmes" else "Kortet er gemt i galleriet (${FigureExport.DIR})")
             }
         }.start()
     }

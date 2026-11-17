@@ -83,9 +83,13 @@ Det skal du vide:
 
 Knappen **Billede** i vandfaldet gemmer en figur af de seneste 30 sekunder i galleriet: vandfaldet med tiden vandret, din kanal markeret, og nedenunder styrken over tid for målet (eller for kanalen, hvis intet mål er valgt). Stiplede streger viser, hvor hvert udbrud begynder, så man ser, hvor tit det kommer.
 
+På fanen **Kort** gemmer samme knap kortet, som du ser det: udsnittet, punkterne eller varmekortet, pejlingerne og farveforklaringen, med dato, tur og mål skrevet under. Zoom og flyt kortet, til det viser det, du vil have med, før du trykker. Billedet følger med, når turen deles; bladrer du til en tidligere tur og tager billedet dér, hører det til den tur.
+
+Vælger du **Det hele**, når du deler, laver appen desuden selv et kort over hele turen: udsnittet rummer alle steder, du har målt, vist som varmekort med mærker og pejlinger. Kortfliserne hentes fra nettet, så uden forbindelse kommer turen med på en tom baggrund. Der er ét sådant kort pr. tur; deler du turen igen, erstattes det.
+
 ## Del
 
-Et tryk på **Del** åbner en dialog for den seneste tur. Du vælger, hvor meget der skal med: kun loggen, loggen og bølgeformen, eller det hele med turens billeder. Dialogen viser kun de valg, turen har filer til, og hvor meget hvert valg fylder. **Pak som én zip-fil** samler det valgte i én fil. Derefter åbner Androids delemenu. Appen siger, hvad den pakker, og hvis en fil ikke kan læses, nævner den filen og pakker resten. Appen skriver ingen tekst for dig, og valgene huskes til næste gang.
+Et tryk på **Del** åbner en dialog for den seneste tur. Du vælger, hvor meget der skal med: kun loggen, loggen og bølgeformen, eller det hele med et kort over turen og turens billeder. Dialogen viser, hvor meget hvert valg fylder. **Pak som én zip-fil** samler det valgte i én fil. Derefter åbner Androids delemenu. Appen siger, hvad den pakker, og hvis en fil ikke kan læses, nævner den filen og pakker resten. Appen skriver ingen tekst for dig, og valgene huskes til næste gang.
 
 **Tidligere ture** i samme dialog, eller et langt tryk på Del, lader dig vælge en eller flere ældre ture, vise dem på kortet eller dele dem.
 
