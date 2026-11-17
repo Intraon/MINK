@@ -37,7 +37,7 @@ Kildekoden ligger i `app/src/main/java/dk/intraon/mink/`, én mappe pr. komponen
 | `measure/` | Selve målingen og det, den sætter i gang | `Beeper.toneHz` | `MeasureService`, `Uploader`, `Beeper` |
 | `core/` | Det, alle deler: tilstanden mellem måling og skærm, brugerens indstillinger og mærkernes typer | `MarkKind` | `Hub`, `Settings` |
 | `waterfall/` | Vandfaldets data og visning, og målebilledet | `Scope`, `Figure`, `Pen` | `WaterfallView`, `CanvasPen`, `FigureExport` |
-| `map/` | Kortlaget, varmekortet og tidligere ture på kortet | `HeatGrid`, `TripPoints` | `PointsOverlay`, `MapData`, `MapExport` |
+| `map/` | Kortlaget, turens spor, varmekortet og tidligere ture på kortet | `Track`, `HeatGrid`, `TripPoints` | `PointsOverlay`, `MapData`, `MapExport` |
 | `direction/` | Retningsantenne: retninger, roset, kompas og kameraskærm | `Bearing`, `Rose`, `CompassCheck`, `HeadingFilter`, `FlatLayout`, `CameraWatch` | `Compass`, `CameraPane` |
 | `trip/` | Turens filer: log, bølgeform, hvilke filer der hører til en tur, og deling | `TripFiles`, `ZipPack` | `JsonlLog`, `IqWav`, `Export`, `TripShare` |
 | `update/` | Opdatering fra GitHub-udgivelser | `Releases` | `Updater` |
@@ -99,7 +99,7 @@ Workflowet **Byg og test** (`.github/workflows/ci.yml`) kører det samme byggesc
 
 ## Test
 
-`sh tools/build.sh` kører alle unittests (`./gradlew testReleaseUnitTest`). Testene dækker den rene Kotlin: detektoren, ringlageret, gain-reglerne, senderlisten, frekvensrettelsen, vandfaldets data, varmekortet, retningsregningen, tur-filerne og udgivelseslæseren. Der er én test pr. regel, appen skal overholde, ikke én pr. funktion.
+`sh tools/build.sh` kører alle unittests (`./gradlew testReleaseUnitTest`). Testene dækker den rene Kotlin: detektoren, ringlageret, gain-reglerne, senderlisten, frekvensrettelsen, vandfaldets data, turens spor, varmekortet, retningsregningen, tur-filerne og udgivelseslæseren. Der er én test pr. regel, appen skal overholde, ikke én pr. funktion.
 
 Skærme, kamera, kompas, deling og installation kan kun prøves på en telefon.
 
