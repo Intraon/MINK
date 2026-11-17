@@ -15,7 +15,7 @@ object Guide {
         4. Gå eller kør rundt. Hver måling gemmes med position, og fanen Kort viser, hvor signalet er stærkest.
 
         KNAPPERNE
-        ⚑ Mærke: sætter et mærke i loggen dér, hvor du står.
+        ⚑ Mærke: sætter et mærke dér, hvor du står, som mulig kilde, fundet kilde eller almindeligt mærke.
         − og + Gain: donglens forstærkning. Appen skruer selv ned ved mætning, men aldrig op.
         Del: sender turens log videre – og bølgeformen og billederne, hvis du krydser dem af. Det hele kan pakkes i én zip-fil. "Tidligere ture" ligger samme sted.
         Billede: gemmer en figur af de seneste 30 sekunder i galleriet.

@@ -32,6 +32,7 @@ import android.widget.TextView
 import android.widget.Toast
 import dk.intraon.mink.map.MapExport
 import dk.intraon.mink.core.Hub
+import dk.intraon.mink.core.MarkKind
 import dk.intraon.mink.core.Settings
 import dk.intraon.mink.direction.CameraPane
 import dk.intraon.mink.map.MapData
@@ -326,7 +327,7 @@ class MainActivity : Activity() {
         startBtn = button("▶ Start", Ui.GREEN) { onStartStop() }.apply { setTextColor(0xFF0E0F12.toInt()); typeface = Typeface.DEFAULT_BOLD }
         add(startBtn, 2.2f)
         add(button(captioned("⚑", "Mærke"), Ui.BUTTON) { v ->
-            if (Hub.running) { MeasureService.send(this, MeasureService.ACTION_MARK); v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS) }
+            if (Hub.running) { v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS); markDialog() }
             else toast("Mærker kan sættes, mens der måles")
         }, 1f)
         add(button(captioned("−", "Gain"), Ui.BUTTON) { MeasureService.send(this, MeasureService.ACTION_GAIN_DOWN) }, 1f)
@@ -482,6 +483,16 @@ class MainActivity : Activity() {
 
     // ---------- eksport ----------
 
+
+    /** Mærke-knappen: hvad er det for et sted? Mærket sættes dér, hvor telefonen er, og vises på kortet. */
+    private fun markDialog() {
+        val kinds = arrayOf(MarkKind.POSSIBLE, MarkKind.FOUND, MarkKind.PLAIN)
+        AlertDialog.Builder(this)
+            .setTitle("Sæt et mærke her")
+            .setItems(arrayOf("Mulig kilde", "Kilde fundet", "Almindeligt mærke")) { _, i -> MeasureService.sendMark(this, kinds[i]) }
+            .setNegativeButton("Annullér", null)
+            .show()
+    }
 
     /** Gemmer figuren af de seneste 30 sekunder som PNG i galleriet. Deling sker fra galleriet, ikke herfra. */
     private fun shareFigure() {

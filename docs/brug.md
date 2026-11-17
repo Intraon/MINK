@@ -22,7 +22,7 @@ Knapperne nederst:
 | Knap | Gør |
 |---|---|
 | **Start / Stop** | Starter og stopper en tur |
-| **⚑ Mærke** | Sætter et nummereret mærke i loggen og på kortet dér, hvor du står |
+| **⚑ Mærke** | Sætter et mærke i loggen og på kortet dér, hvor du står. Du vælger, om stedet er en mulig kilde, en fundet kilde eller et almindeligt, nummereret mærke. Mærkerne står også på kortbillederne |
 | **− og + Gain** | Flytter donglens forstærkning ét trin, med det samme |
 | **Del** | Sender turens filer videre, se [Del](#del) |
 | **⚙ Indstil** | Kanal, bånd og resten af indstillingerne |

@@ -35,7 +35,7 @@ Kildekoden ligger i `app/src/main/java/dk/intraon/mink/`, én mappe pr. komponen
 | `dsp/` | Signalbehandling: FFT, detektoren, ringlageret med rå samples | `Fft`, `BurstDetector`, `IqRing` | – |
 | `radio/` | Donglen: rtl_tcp-klienten, gain, frekvensrettelse, hvilke sendere der høres | `GainControl`, `Calibrate`, `SourceTracker` | `RtlTcpClient` (kun sockets) |
 | `measure/` | Selve målingen og det, den sætter i gang | `Beeper.toneHz` | `MeasureService`, `Uploader`, `Beeper` |
-| `core/` | Det, alle deler: tilstanden mellem måling og skærm, og brugerens indstillinger | – | `Hub`, `Settings` |
+| `core/` | Det, alle deler: tilstanden mellem måling og skærm, brugerens indstillinger og mærkernes typer | `MarkKind` | `Hub`, `Settings` |
 | `waterfall/` | Vandfaldets data og visning, og målebilledet | `Scope`, `Figure`, `Pen` | `WaterfallView`, `CanvasPen`, `FigureExport` |
 | `map/` | Kortlaget, varmekortet og tidligere ture på kortet | `HeatGrid`, `TripPoints` | `PointsOverlay`, `MapData`, `MapExport` |
 | `direction/` | Retningsantenne: retninger, roset, kompas og kameraskærm | `Bearing`, `Rose`, `CompassCheck`, `HeadingFilter`, `FlatLayout` | `Compass`, `CameraPane` |

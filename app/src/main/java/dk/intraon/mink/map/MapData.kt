@@ -3,6 +3,7 @@ package dk.intraon.mink.map
 import android.content.Context
 import android.net.Uri
 import dk.intraon.mink.core.Hub
+import dk.intraon.mink.core.MarkKind
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
@@ -61,7 +62,7 @@ object MapData {
                     ) }
                     // tb = målinger fra målet; null = intet mål var valgt, og så er der ikke noget "stille"
                     "tick" -> if (if (o.has("tb")) (!o.isNull("tb") && o.optInt("tb") == 0) else o.optInt("bursts", 1) == 0) s.add(Hub.Point(time(o), lat, lon, null, null, null, 0, o.optDouble("gain", 0.0)))
-                    "mark" -> m.add(Hub.Mark(time(o), lat, lon, o.optInt("n")))
+                    "mark" -> m.add(Hub.Mark(time(o), lat, lon, o.optInt("n"), MarkKind.of(o.optString("kind"))))
                     "bearing" -> if (!o.isNull("hdg")) br.add(Hub.BearingLine(time(o), lat, lon, o.getDouble("hdg"), if (o.isNull("lvl")) null else o.optDouble("lvl"), o.optInt("n")))
                 }
             }

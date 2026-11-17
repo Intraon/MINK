@@ -25,7 +25,8 @@ object Hub {
         val gain: Double,
     )
 
-    data class Mark(val t: Long, val lat: Double?, val lon: Double?, val n: Int)
+    /** Et mærke, brugeren har sat. [kind] er en af typerne i [MarkKind]. */
+    data class Mark(val t: Long, val lat: Double?, val lon: Double?, val n: Int, val kind: String = MarkKind.PLAIN)
     data class GainStep(val t: Long, val to: Double)
     /** En gemt pejling: herfra, i den retning, med det niveau (null = intet hørt, da den blev taget). */
     data class BearingLine(val t: Long, val lat: Double?, val lon: Double?, val deg: Double, val level: Double?, val n: Int)
