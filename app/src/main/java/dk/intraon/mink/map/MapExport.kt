@@ -34,11 +34,11 @@ object MapExport {
     /** Så længe ventes der højst på kortfliser, der skal hentes. */
     const val WAIT_MS = 7_000L
     private const val POLL_MS = 300L
-    /** Punkter, felter og tekst på et turbillede tegnes, som om skærmen havde denne tæthed. */
+    /** Spor, mærker og tekst på et turbillede tegnes, som om skærmen havde denne tæthed. */
     private const val DENSITY = 2f
 
     /**
-     * Tegner kortet, som det ses på skærmen: alt, hvad der ligger på det (punkter eller varmekort, mærker,
+     * Tegner kortet, som det ses på skærmen: alt, hvad der ligger på det (spor eller varmekort, mærker,
      * pejlinger og kildeangivelsen), farveforklaringen [legend] dér, hvor den står, og [caption] på en bjælke under
      * kortet. Skal kaldes på hovedtråden. Null, hvis kortet ikke har en størrelse endnu.
      */
@@ -61,7 +61,8 @@ object MapExport {
 
     /**
      * Tegner et kort over en hel tur uden om skærmen. Udsnittet lægges, så alle turens steder er med, og turen
-     * vises som varmekort med mærker og pejlinger. Under kortet står [caption], farveforklaringen og kortets kilde.
+     * vises som et spor farvet efter niveauet, med mærker og pejlinger. Under kortet står [caption],
+     * farveforklaringen og kortets kilde.
      *
      * Kortfliserne hentes, mens der ventes; dem, der ikke er kommet efter [WAIT_MS], mangler på billedet. [done]
      * kaldes på hovedtråden med billedet, eller med null, hvis turen ingen steder har. Skal kaldes på hovedtråden.
@@ -81,7 +82,8 @@ object MapExport {
         val view = RectL().also { pj.getMercatorViewPort(it) }
         val provider = MapTileProviderBasic(ctx.applicationContext, TileSourceFactory.MAPNIK)
         val tiles = TilesOverlay(provider, ctx.applicationContext)
-        val overlay = PointsOverlay(DENSITY).apply { only = points; heat = true }
+        val overlay = PointsOverlay(DENSITY).apply { only = points }
+        val legend = points.range()?.let { "blå ${Ui.f1(it.first)} → rød ${Ui.f1(it.second)} dB · gråt = lyttet, intet hørt" } ?: "målet blev ikke hørt på turen"
         val handler = Handler(Looper.getMainLooper())
         val started = SystemClock.elapsedRealtime()
 
@@ -100,7 +102,7 @@ object MapExport {
             p.color = Ui.TEXT; p.textSize = 13 * DENSITY
             c.drawText(caption, 8 * DENSITY, H + 21f * DENSITY, p)
             p.color = Ui.DIM; p.textSize = 11 * DENSITY
-            c.drawText(overlay.heatLegend, 8 * DENSITY, H + 42f * DENSITY, p)
+            c.drawText(legend, 8 * DENSITY, H + 42f * DENSITY, p)
             c.drawText(source, W - 8 * DENSITY - p.measureText(source), H + 42f * DENSITY, p)
             done(bmp)
         }

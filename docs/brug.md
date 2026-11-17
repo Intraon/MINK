@@ -45,9 +45,11 @@ Appen skruer aldrig selv op for forstærkningen. Du vælger et gain, og det er l
 
 ## Kortet
 
-Hver måling gemmes med position og tegnes som en prik, farvet fra blå (svagest) til rød (stærkest). Små grå prikker er steder, hvor der blev lyttet uden at høre målet. De er lige så vigtige: de viser, hvor senderen ikke kan høres.
+Hver måling gemmes med position, og turen tegnes som en linje, der skifter farve fra måling til måling: blå er svagest, rød er stærkest. Linjen er grå, hvor der blev lyttet uden at høre målet. De stykker er lige så vigtige: de viser, hvor senderen ikke kan høres. Den stærkeste måling har en hvid ring med sit niveau.
 
-- **▦** slår varmekortet til: målingerne samles i felter, hvis størrelse følger zoom, fra 25 m og op. Det stærkeste felt får en hvid ramme med sit niveau. Der gættes ikke mellem felterne; hvor du ikke har været, er kortet tomt.
+Går du samme vej to gange, ligger den stærkeste måling øverst. Din krop, en bygning eller et udfald kan kun gøre en måling svagere, så den stærkeste siger mest om afstanden. Holder målingen pause i mere end et halvt minut, begynder linjen forfra dér, hvor den kommer i gang igen.
+
+- **▦** skifter til varmekortet: målingerne samles i felter, hvis størrelse følger zoom, fra 25 m og op. Det stærkeste felt får en hvid ramme med sit niveau. Der gættes ikke mellem felterne; hvor du ikke har været, er kortet tomt.
 - **◉** følger din position.
 - **◀ og ▶** bladrer gennem tidligere ture. Tryk på turens navn imellem dem for at vælge flere på én gang.
 
@@ -83,9 +85,9 @@ Det skal du vide:
 
 Knappen **Billede** i vandfaldet gemmer en figur af de seneste 30 sekunder i galleriet: vandfaldet med tiden vandret, din kanal markeret, og nedenunder styrken over tid for målet (eller for kanalen, hvis intet mål er valgt). Stiplede streger viser, hvor hvert udbrud begynder, så man ser, hvor tit det kommer.
 
-På fanen **Kort** gemmer samme knap kortet, som du ser det: udsnittet, punkterne eller varmekortet, pejlingerne og farveforklaringen, med dato, tur og mål skrevet under. Zoom og flyt kortet, til det viser det, du vil have med, før du trykker. Billedet følger med, når turen deles; bladrer du til en tidligere tur og tager billedet dér, hører det til den tur.
+På fanen **Kort** gemmer samme knap kortet, som du ser det: udsnittet, linjen eller varmekortet, pejlingerne og farveforklaringen, med dato, tur og mål skrevet under. Zoom og flyt kortet, til det viser det, du vil have med, før du trykker. Billedet følger med, når turen deles; bladrer du til en tidligere tur og tager billedet dér, hører det til den tur.
 
-Vælger du **Det hele**, når du deler, laver appen desuden selv et kort over hele turen: udsnittet rummer alle steder, du har målt, vist som varmekort med mærker og pejlinger. Kortfliserne hentes fra nettet, så uden forbindelse kommer turen med på en tom baggrund. Der er ét sådant kort pr. tur; deler du turen igen, erstattes det.
+Vælger du **Det hele**, når du deler, laver appen desuden selv et kort over hele turen: udsnittet rummer alle steder, du har målt, og turen er tegnet som den farvede linje med mærker og pejlinger. Kortfliserne hentes fra nettet, så uden forbindelse kommer turen med på en tom baggrund. Der er ét sådant kort pr. tur; deler du turen igen, erstattes det.
 
 ## Del
 
