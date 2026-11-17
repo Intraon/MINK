@@ -43,6 +43,12 @@ object TripFiles {
         if (shown == null) "MINK_kort_$now.png" else "MINK_kort_${shown}_$now.png"
 
     /**
+     * Navnet på et billede af vandfaldet for den tidligere tur [session], taget [now]. Turens tidsstempel står først,
+     * så billedet hører til den tur, det viser.
+     */
+    fun replayPictureName(now: String, session: String): String = "MINK_vandfald_${session}_$now.png"
+
+    /**
      * Navnet på det kort over hele turen [session], som laves, når turen deles. Der er ét pr. tur; deles turen
      * igen, erstattes det.
      */
