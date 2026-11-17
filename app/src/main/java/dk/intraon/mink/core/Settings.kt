@@ -83,15 +83,12 @@ class Settings(ctx: Context) {
     var nomediaDone: Boolean
         get() = p.getBoolean("nomediaDone", false)
         set(v) = p.edit().putBoolean("nomediaDone", v).apply()
-    /** Hvad der sidst blev taget med, da en tur blev delt: bølgeform, billeder, og om det hele blev pakket i en zip. */
-    var shareIq: Boolean
-        get() = p.getBoolean("shareIq", false)
-        set(v) = p.edit().putBoolean("shareIq", v).apply()
-    var sharePics: Boolean
-        get() = p.getBoolean("sharePics", true)
-        set(v) = p.edit().putBoolean("sharePics", v).apply()
+    /** Hvor meget der sidst blev taget med, da en tur blev delt (se TripFiles.SHARE_…), og om det blev pakket i en zip. */
+    var shareLevel: Int
+        get() = p.getInt("shareLevel", 2)
+        set(v) = p.edit().putInt("shareLevel", v).apply()
     var shareZip: Boolean
-        get() = p.getBoolean("shareZip", false)
+        get() = p.getBoolean("shareZip", true)
         set(v) = p.edit().putBoolean("shareZip", v).apply()
     /** Se selv efter nye versioner på GitHub. */
     var autoUpdate: Boolean

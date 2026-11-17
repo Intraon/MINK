@@ -21,6 +21,18 @@ object TripFiles {
     /** Starten på den første tur efter [session] blandt [all], eller null hvis [session] er den nyeste. */
     fun nextAfter(session: String, all: Collection<String>): String? = all.filter { it > session }.minOrNull()
 
+    /** Hvor meget en deling tager med, fra mindst til mest. Tallene gemmes i indstillingerne. */
+    const val SHARE_LOG = 0
+    const val SHARE_WAVE = 1
+    const val SHARE_ALL = 2
+
+    /** De trin, en tur kan deles på: altid loggen alene; med bølgeform, hvis turen har én; det hele, hvis den har billeder. */
+    fun shareLevels(hasWave: Boolean, hasPics: Boolean): List<Int> =
+        listOfNotNull(SHARE_LOG, SHARE_WAVE.takeIf { hasWave }, SHARE_ALL.takeIf { hasPics })
+
+    /** Det trin, dialogen står på: det, der blev valgt sidst, eller det højeste under det, som turen har filer til. */
+    fun shareLevel(remembered: Int, levels: List<Int>): Int = levels.lastOrNull { it <= remembered } ?: SHARE_LOG
+
     /** "16.11.2026 kl. 22.37" ud af et filnavn med tidsstempel; navnet selv, hvis det ikke har et. */
     fun title(name: String): String {
         val m = Regex("""(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})""").find(name) ?: return name

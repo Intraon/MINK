@@ -30,4 +30,14 @@ class TripFilesTest {
         assertNull(TripFiles.nextAfter("20261116_230110", all))
     }
 
+    @Test fun delingTilbyderKunDetTurenHarOgHuskerValget() {
+        assertEquals(listOf(TripFiles.SHARE_LOG), TripFiles.shareLevels(hasWave = false, hasPics = false))
+        assertEquals(listOf(TripFiles.SHARE_LOG, TripFiles.SHARE_WAVE, TripFiles.SHARE_ALL), TripFiles.shareLevels(hasWave = true, hasPics = true))
+        val all = TripFiles.shareLevels(hasWave = true, hasPics = true)
+        assertEquals("det hele er valgt, til brugeren vælger andet", TripFiles.SHARE_ALL, TripFiles.shareLevel(TripFiles.SHARE_ALL, all))
+        assertEquals("uden billeder er bølgeformen det meste, der kan deles", TripFiles.SHARE_WAVE,
+            TripFiles.shareLevel(TripFiles.SHARE_ALL, TripFiles.shareLevels(hasWave = true, hasPics = false)))
+        assertEquals("et valg uden billeder bliver ikke til et valg med billeder", TripFiles.SHARE_LOG,
+            TripFiles.shareLevel(TripFiles.SHARE_WAVE, TripFiles.shareLevels(hasWave = false, hasPics = true)))
+    }
 }
