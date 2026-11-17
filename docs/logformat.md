@@ -134,4 +134,4 @@ Er der skrevet en webhook-adresse under ⚙, sendes posterne dertil med POST hve
 {"session":"20261114_221500","seq":42,"version":"0.4.460700","records":[ …samme poster som i loggen… ]}
 ```
 
-En pakke beholder sit `seq`, til den er afleveret. Et hul i rækken betyder derfor tab, og et gensendt kald er ikke en ny pakke. Bølgeformen sendes ikke.
+En pakke beholder sit `seq` og sit indhold, til den er afleveret. Et hul i rækken betyder derfor tab, og et gensendt kald er præcis den samme pakke: en modtager, der allerede har fået den, kan springe den over på `seq`. Når målingen stoppes, sendes resten af køen, i højst 15 sekunder; det, der ikke når frem, findes kun i loggen. Bølgeformen sendes ikke.
