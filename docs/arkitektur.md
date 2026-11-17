@@ -57,6 +57,8 @@ Afhængighederne går nedad i dataflowet: `dsp/` kender ingen andre, `radio/` ke
 | `mink-kamera` | Kameraets tilbagekald |
 | Hovedtråden | Skærmen. Den læser `Hub` og får besked gennem `Hub.changed()` |
 
+`RtlTcpClient.stop()` venter på læsetråden (højst et halvt sekund), så ingen blok er under behandling, når måletjenesten lukker log og bølgeform eller starter en ny forbindelse.
+
 `Hub` er den eneste kanal mellem måling og skærm. Felterne er `@Volatile` eller trådsikre lister; skærmen ændrer aldrig måletilstanden direkte, men sender en handling til `MeasureService` (`MeasureService.send`, `sendGain`, `sendPpm`, `sendTarget`, `sendBearing`).
 
 ## Start af en tur

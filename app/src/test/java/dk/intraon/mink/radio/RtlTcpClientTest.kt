@@ -47,4 +47,40 @@ class RtlTcpClientTest {
         c.stop()
         server.close()
     }
+
+    @Test
+    fun efterStopBehandlesOgKommerDerIngenBlokke() {
+        // en driver, der sender blokke uden ophør, og en modtager, der bruger 30 ms på hver blok
+        val server = ServerSocket(0)
+        Thread {
+            try {
+                val out = server.accept().getOutputStream()
+                out.write(ByteBuffer.allocate(12).put("RTL0".toByteArray()).putInt(5).putInt(29).array())
+                while (true) out.write(ByteArray(4096))
+            } catch (_: Exception) {}
+        }.start()
+
+        val busy = java.util.concurrent.atomic.AtomicBoolean()
+        val stopped = java.util.concurrent.atomic.AtomicBoolean()
+        val late = java.util.concurrent.atomic.AtomicInteger()
+        val seen = java.util.concurrent.CountDownLatch(3)
+        val c = RtlTcpClient("127.0.0.1", server.localPort, 4096, { _, _ ->
+            if (stopped.get()) late.incrementAndGet()
+            // regnearbejde, som et afbrud ikke stopper
+            busy.set(true)
+            val until = System.nanoTime() + 30_000_000
+            while (System.nanoTime() < until) { /* arbejder */ }
+            busy.set(false)
+            seen.countDown()
+        }, { _, _ -> })
+        c.start(869_725_000L, 1_024_000, 0, 20.7)
+        assertTrue(seen.await(5, TimeUnit.SECONDS))
+
+        c.stop()
+        stopped.set(true)
+        assertTrue("en blok var stadig under behandling, da stop vendte tilbage", !busy.get())
+        Thread.sleep(150)
+        assertEquals("blokke afleveret efter stop", 0, late.get())
+        server.close()
+    }
 }
