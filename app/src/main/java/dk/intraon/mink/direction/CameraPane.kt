@@ -18,7 +18,8 @@ import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.os.Handler
-import android.os.HandlerThread
+import android.os.Looper
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Size
 import android.view.Gravity
@@ -55,8 +56,12 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
     private val overlay = Overlay(a)
     private val compass = Compass(a, motion = true)
     private var calDialog: AlertDialog? = null
-    private var thread: HandlerThread? = null
-    private var handler: Handler? = null
+    /** Kameraets tilbagemeldinger kommer på hovedtråden, så de ikke kan krydse en ændring af billedets størrelse. */
+    private val main = Handler(Looper.getMainLooper())
+    private val watch = CameraWatch()
+    /** Tæller op, hver gang kameraet startes eller stoppes; en tilbagemelding fra et ældre forsøg kendes på sit tal. */
+    private var run = 0
+    private var starting = false
     private var device: CameraDevice? = null
     private var session: CameraCaptureSession? = null
     private var preview = Size(1280, 720)
@@ -66,8 +71,18 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
     /** Kamerabilledets størrelse på skærmen. Det er mindst lige så stort som feltet og beskæres i kanten. */
     private var texW = 0
     private var texH = 0
-    @Volatile private var error: String? = null
+    private var error: String? = null
+    /** Sat, når der ikke er et kamera at prøve igen med. */
+    private var hopeless = false
     private var wanted = false
+    /** Et kamerabillede fra et steds stærkeste måling: hvornår målingen blev taget, og hvor telefonen pegede. */
+    private class Held(val at: Long, val frame: Bitmap, val hdg: Double, val tilt: Double)
+    /** Højst to billeder: det fra stedets stærkeste måling indtil nu, og det, der blev holdt før. */
+    private val held = ArrayList<Held>()
+    /** Den pejling, appen selv har gemt, som skærmen senest har taget sig af. */
+    private var handled: Hub.AutoBearing? = Hub.autoBearing
+    /** Det, et foto af en tidligere måling skal vise i stedet for det, der måles lige nu. */
+    private class Shot(val rose: Rose, val status: String)
 
     init {
         setBackgroundColor(0xFF000000.toInt())
@@ -82,9 +97,13 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
         addView(pick, LayoutParams(WRAP_CONTENT, (34 * d).toInt(), Gravity.BOTTOM or Gravity.END).apply { bottomMargin = (21 * d).toInt(); rightMargin = (8 * d).toInt() })
         texture.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) { if (wanted) startCamera() }
-            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
-            override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean { stopCamera(); return true }
-            override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+            // Når feltet skifter størrelse, sætter Android billedets størrelse til feltets. Kameraet kan kun levere
+            // sine egne størrelser, så dets størrelse sættes tilbage med det samme.
+            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {
+                if (starting || device != null) st.setDefaultBufferSize(preview.width, preview.height)
+            }
+            override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean { stopCamera(); watch.stopped(); return true }
+            override fun onSurfaceTextureUpdated(st: SurfaceTexture) { watch.frame(SystemClock.elapsedRealtime()) }
         }
     }
 
@@ -97,7 +116,7 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
             a.requestPermissions(arrayOf(Manifest.permission.CAMERA), MainActivity.REQ_CAMERA)
             return
         }
-        if (texture.isAvailable && device == null) startCamera()
+        if (texture.isAvailable) startCamera()
         // første gang i denne omgang: kompasset skal kalibreres, før retningerne er noget værd
         if (!Hub.compassCalibrated && compass.available) calibrate()
     }
@@ -147,11 +166,15 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
     }
 
     fun close() {
+        // stedet er færdigt, når skærmen forlades: dets stærkeste retning gemmes som pejling
+        if (wanted) MeasureService.sendPlaceDone(a)
         wanted = false
         calDialog?.dismiss()
         compass.stop()
         overlay.pause()
         stopCamera()
+        watch.stopped()
+        if (!hopeless) error = null
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -171,13 +194,15 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
 
     @SuppressLint("MissingPermission")
     private fun startCamera() {
-        if (device != null || thread != null) return
-        error = null
+        if (device != null || starting || hopeless) return
+        val mine = ++run
+        starting = true
+        watch.started(SystemClock.elapsedRealtime())
         try {
             val cm = a.getSystemService(Context.CAMERA_SERVICE) as CameraManager
             val id = cm.cameraIdList.firstOrNull { cm.getCameraCharacteristics(it).get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK }
                 ?: cm.cameraIdList.firstOrNull()
-            if (id == null) { error = "Telefonen har intet kamera"; return }
+            if (id == null) { starting = false; hopeless = true; watch.stopped(); error = "Telefonen har intet kamera"; return }
             val ch = cm.getCameraCharacteristics(id)
             val sizes = ch.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)?.getOutputSizes(SurfaceTexture::class.java)?.toList().orEmpty()
             preview = sizes.filter { it.width <= 1920 && it.width * 9 == it.height * 16 }.maxByOrNull { it.width }
@@ -193,48 +218,58 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
                 vfov = Math.toDegrees(2 * atan(long / (2.0 * f)))
             }
             fitTexture()
-            val t = HandlerThread("mink-kamera").also { it.start() }
-            thread = t; handler = Handler(t.looper)
             cm.openCamera(id, object : CameraDevice.StateCallback() {
                 override fun onOpened(cam: CameraDevice) {
                     // skærmen kan være forladt, mens kameraet var ved at åbne
-                    if (!wanted) { cam.close(); return }
-                    device = cam; startPreview(cam)
+                    if (mine != run || !wanted) { cam.close(); return }
+                    starting = false; device = cam; startPreview(cam, mine)
                 }
-                override fun onDisconnected(cam: CameraDevice) { cam.close(); device = null }
-                override fun onError(cam: CameraDevice, code: Int) { cam.close(); device = null; error = "Kameraet kunne ikke åbnes (fejl $code)" }
-            }, handler)
+                override fun onDisconnected(cam: CameraDevice) { cam.close(); if (mine == run) fail("Kameraet kunne ikke åbnes") }
+                override fun onError(cam: CameraDevice, code: Int) { cam.close(); if (mine == run) fail("Kameraet kunne ikke åbnes (fejl $code)") }
+            }, main)
         } catch (_: SecurityException) {
-            error = "MINK har ikke adgang til kameraet"
+            fail("MINK har ikke adgang til kameraet")
         } catch (_: Exception) {
-            error = "Kameraet kunne ikke åbnes"
+            fail("Kameraet kunne ikke åbnes")
         }
     }
 
-    private fun startPreview(cam: CameraDevice) {
+    private fun startPreview(cam: CameraDevice, mine: Int) {
         try {
-            val st = texture.surfaceTexture ?: return
+            val st = texture.surfaceTexture
+            if (st == null) { fail("Kameraet kunne ikke vise billedet"); return }
             st.setDefaultBufferSize(preview.width, preview.height)
             val surface = Surface(st)
             val req = cam.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply { addTarget(surface) }
             @Suppress("DEPRECATION")
             cam.createCaptureSession(listOf(surface), object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(s: CameraCaptureSession) {
+                    if (mine != run) return
                     session = s
-                    try { s.setRepeatingRequest(req.build(), null, handler) } catch (_: Exception) { error = "Kameraet kunne ikke vise billedet" }
+                    try { s.setRepeatingRequest(req.build(), null, main) } catch (_: Exception) { fail("Kameraet kunne ikke vise billedet") }
                 }
-                override fun onConfigureFailed(s: CameraCaptureSession) { error = "Kameraet kunne ikke vise billedet" }
-            }, handler)
+                override fun onConfigureFailed(s: CameraCaptureSession) { if (mine == run) fail("Kameraet kunne ikke vise billedet") }
+            }, main)
         } catch (_: Exception) {
-            error = "Kameraet kunne ikke vise billedet"
+            fail("Kameraet kunne ikke vise billedet")
         }
     }
 
+    /**
+     * Et forsøg på at få kameraet i gang mislykkedes: kameraet lukkes, og [watch] bestemmer, hvornår der prøves igen.
+     * [message] vises først, når flere forsøg i træk er slået fejl.
+     */
+    private fun fail(message: String) {
+        stopCamera()
+        watch.failed(SystemClock.elapsedRealtime())
+        error = if (watch.givenUp) message else null
+    }
+
     private fun stopCamera() {
+        run++
         try { session?.close() } catch (_: Exception) {}
         try { device?.close() } catch (_: Exception) {}
-        session = null; device = null
-        thread?.quitSafely(); thread = null; handler = null
+        session = null; device = null; starting = false
     }
 
     /** Gemmer pejlingen i loggen (og dermed på kortet) og et foto med retning og styrke i galleriet. */
@@ -247,9 +282,55 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
         val now = Date()
         val photo = "MINK_pejling_" + SimpleDateFormat("yyyyMMdd_HHmmss", Ui.DA).format(now) + ".jpg"
         MeasureService.sendBearing(a, photo)
-        val vw = width; val vh = height
         val raw = try { if (device != null && texW > 0) texture.getBitmap(texW, texH) else null } catch (_: Throwable) { null }
         val last = Hub.lastBurst?.takeIf { now.time - it.t < 6_000 }
+        val line = "${hdg.roundToInt()}° ${Bearing.name(hdg)}" + (last?.level?.let { " · niveau ${Ui.f1(it)} dB" } ?: " · intet hørt")
+        savePhoto(photo, raw, hdg, Hub.tiltDeg, now, null, line) { ok ->
+            a.toast(if (ok) "Pejling ${hdg.roundToInt()}° gemt på kortet og som foto i galleriet" else "Pejling ${hdg.roundToInt()}° gemt på kortet (fotoet kunne ikke gemmes)")
+        }
+    }
+
+    /**
+     * Holder kamerabilledet fra stedets stærkeste måling indtil nu, så stedets pejling kan få et foto, når appen
+     * selv gemmer den. Det forrige billede beholdes: stedet, det hører til, kan være forladt, uden at pejlingen
+     * er gemt endnu.
+     */
+    private fun hold() {
+        val at = Hub.rose.topAt
+        if (at == 0L || at == Hub.heldFrameAt || !Hub.running || Hub.flat || device == null || texW <= 0) return
+        val hdg = Hub.freshHeading() ?: return
+        val frame = try { texture.getBitmap(texW, texH) } catch (_: Throwable) { null } ?: return
+        while (held.size > 1) held.removeAt(0).frame.recycle()
+        held.add(Held(at, frame, hdg, Hub.tiltDeg))
+        Hub.heldFrameAt = at
+    }
+
+    /**
+     * Appen har selv gemt en pejling for et sted, brugeren har forladt: fortæl det, og gem fotoet fra stedets
+     * stærkeste måling, hvis det blev holdt. Kaldes, hver gang noget har ændret sig; gør kun noget én gang pr. pejling.
+     */
+    fun autoSaved() {
+        val ab = Hub.autoBearing ?: return
+        if (ab === handled) return
+        handled = ab
+        val best = ab.stop.best
+        val what = "Stedets stærkeste retning ${best.roundToInt()}° ${Bearing.name(best)}"
+        val shot = held.firstOrNull { it.at == ab.stop.at }
+        if (ab.photo == null || shot == null || width == 0) { a.toast("$what er gemt som pejling på kortet"); return }
+        held.remove(shot)
+        val level = "niveau ${Ui.f1(ab.stop.level)} dB"
+        savePhoto(ab.photo, shot.frame, shot.hdg, shot.tilt, Date(shot.at), Shot(ab.stop.rose, "stedets stærkeste måling · $level"), "stærkest ${best.roundToInt()}° ${Bearing.name(best)} · $level") { ok ->
+            a.toast(if (ok) "$what er gemt som pejling på kortet og som foto i galleriet" else "$what er gemt som pejling på kortet (fotoet kunne ikke gemmes)")
+        }
+    }
+
+    /**
+     * Tegner et pejlingsfoto og gemmer det i galleriet under [name]: kamerabilledet [raw] (null = intet kamerabillede),
+     * det, skærmen viser oven på det, og en linje nederst med tidspunktet og [line], så fotoet kan stå alene.
+     * [done] kaldes på hovedtråden med, om fotoet blev gemt. [raw] frigives.
+     */
+    private fun savePhoto(name: String, raw: Bitmap?, hdg: Double, tilt: Double, time: Date, shot: Shot?, line: String, done: (Boolean) -> Unit) {
+        val vw = width; val vh = height
         Thread {
             var uri: Uri? = null
             try {
@@ -257,16 +338,13 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
                 val c = Canvas(out)
                 c.drawColor(0xFF000000.toInt())
                 if (raw != null) c.drawBitmap(raw, ((vw - raw.width) / 2).toFloat(), ((vh - raw.height) / 2).toFloat(), null)
-                overlay.paint(c, vw, vh, hdg, Hub.tiltDeg, now.time)
-                // billedets egen linje nederst, så det kan stå alene
+                overlay.paint(c, vw, vh, hdg, tilt, time.time, shot)
                 val p = Paint(Paint.ANTI_ALIAS_FLAG)
                 p.color = 0xD9000000.toInt(); c.drawRect(0f, vh - 34 * d, vw.toFloat(), vh.toFloat(), p)
                 p.color = 0xFFFFFFFF.toInt(); p.textSize = 14 * d
-                val line = "MINK · " + SimpleDateFormat("d.M.yyyy HH:mm:ss", Ui.DA).format(now) + " · ${hdg.roundToInt()}° ${Bearing.name(hdg)}" +
-                    (last?.level?.let { " · niveau ${Ui.f1(it)} dB" } ?: " · intet hørt")
-                c.drawText(line, 10 * d, vh - 12 * d, p)
+                c.drawText("MINK · " + SimpleDateFormat("d.M.yyyy HH:mm:ss", Ui.DA).format(time) + " · " + line, 10 * d, vh - 12 * d, p)
                 val values = ContentValues().apply {
-                    put(MediaStore.Images.Media.DISPLAY_NAME, photo)
+                    put(MediaStore.Images.Media.DISPLAY_NAME, name)
                     put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
                     put(MediaStore.Images.Media.RELATIVE_PATH, FigureExport.DIR)
                 }
@@ -276,9 +354,7 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
             } catch (_: Throwable) {
                 uri = null
             }
-            a.runOnUiThread {
-                a.toast(if (uri != null) "Pejling ${hdg.roundToInt()}° gemt på kortet og som foto i galleriet" else "Pejling ${hdg.roundToInt()}° gemt på kortet (fotoet kunne ikke gemmes)")
-            }
+            a.runOnUiThread { done(uri != null) }
         }.start()
     }
 
@@ -296,9 +372,14 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
 
         override fun onDraw(c: Canvas) {
             // ligger telefonen fladt, er kameraet ikke til nogen nytte: det slukkes, og tændes igen på højkant
-            if (Hub.flat) { if (device != null) stopCamera() }
-            else if (wanted && device == null && thread == null && texture.isAvailable && error == null &&
-                a.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startCamera()
+            val t = SystemClock.elapsedRealtime()
+            if (Hub.flat) { if (device != null || starting) { stopCamera(); watch.stopped() } }
+            else if (wanted && texture.isAvailable && a.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                if (watch.stalled(t)) fail("Kameraet kunne ikke vise billedet")
+                else if (!hopeless && watch.mayStart(t)) startCamera()
+            }
+            autoSaved()
+            hold()
             paint(c, width, height, Hub.freshHeading(), Hub.tiltDeg, System.currentTimeMillis())
         }
 
@@ -349,7 +430,7 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
         }
 
         /** Feltet øverst: retningen, målets styrke lige nu, og en eventuel advarsel under. */
-        private fun header(c: Canvas, w: Int, hdg: Double, now: Long, warn: String?, what: String) {
+        private fun header(c: Canvas, w: Int, hdg: Double, now: Long, warn: String?, what: String, fixed: String? = null) {
             p.style = Paint.Style.FILL; p.color = 0xB0000000.toInt()
             c.drawRect(0f, 0f, w.toFloat(), 58 * d, p)
             p.color = 0xFFFFFFFF.toInt(); p.textAlign = Paint.Align.LEFT; p.textSize = 22 * d
@@ -359,7 +440,7 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
             c.drawText(what, x, 26 * d, p)
             p.color = 0xFFFFFFFF.toInt()
             val last = Hub.lastBurst
-            val status = when {
+            val status = fixed ?: when {
                 !Hub.running -> "Tryk Start for at måle"
                 Hub.targetHz == null -> "Vælg et mål: tryk Mål, eller i vandfaldet"
                 last != null && now - last.t < 6_000 -> String.format(Ui.DA, "%+d dB over støjen · niveau %s dB", (last.snr ?: 0.0).roundToInt(), Ui.f1(last.level ?: 0.0))
@@ -376,16 +457,17 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
             }
         }
 
-        fun paint(c: Canvas, w: Int, h: Int, hdg: Double?, tilt: Double, now: Long) {
+        /** Med [shot] tegnes et foto af en tidligere måling: dens rose og tekst, altid som kamerabillede og uden advarsler. */
+        fun paint(c: Canvas, w: Int, h: Int, hdg: Double?, tilt: Double, now: Long, shot: Shot? = null) {
             val cx = w / 2f; val cy = h / 2f
             val err = error
             if (err != null) { center(c, err, cx, cy); return }
             if (hdg == null) { center(c, if (compass.available) "Venter på kompasset …" else "Telefonen har intet kompas", cx, cy); return }
-            if (Hub.flat) { paintFlat(c, w, h, hdg, now); return }
+            if (Hub.flat && shot == null) { paintFlat(c, w, h, hdg, now); return }
             val tw = if (texW > 0) texW.toFloat() else w.toFloat()
             val th = if (texH > 0) texH.toFloat() else h.toFloat()
             // horisonten flytter sig ned i billedet, når telefonen vipper op
-            val warn = when {
+            val warn = if (shot != null) null else when {
                 Hub.compassPoor -> "Kompasset viser forkert – tryk Kalibrér kompas"
                 kotlin.math.abs(tilt) > 35 -> "Hold telefonen på højkant – eller læg den helt fladt"
                 else -> null
@@ -396,7 +478,7 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
                 .coerceIn(minOf(panel + 52 * d, 0.6f * h), maxOf(h - 250 * d, 0.6f * h))
 
             // farvebåndet: hver retning, der er målt i, farvet efter styrken dér
-            val rose = Hub.rose
+            val rose = shot?.rose ?: Hub.rose
             val range = rose.range()
             p.style = Paint.Style.FILL
             for (i in 0 until rose.bins) {
@@ -437,7 +519,7 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
             c.drawLine(cx - 30 * d, cy, cx - 16 * d, cy, p); c.drawLine(cx + 16 * d, cy, cx + 30 * d, cy, p)
             c.drawLine(cx, cy - 30 * d, cx, cy - 16 * d, p); c.drawLine(cx, cy + 16 * d, cx, cy + 30 * d, p)
 
-            header(c, w, hdg, now, warn, "kameraet")
+            header(c, w, hdg, now, warn, "kameraet", shot?.status)
 
             // nederst til venstre: hele rosen set oppefra, nord op
             val rx = 58 * d; val ry = h - 122 * d; val rr = 44 * d
