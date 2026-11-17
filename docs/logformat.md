@@ -92,7 +92,7 @@ Skrives hvert 10. sekund.
 
 | `type` | Felter | Skrives, når |
 |---|---|---|
-| `mark` | `n` | Brugeren sætter et mærke |
+| `mark` | `n`, `kind` | Brugeren sætter et mærke. `kind` er `mark` (almindeligt), `possible` (mulig kilde) eller `found` (kilde fundet). Mangler feltet, er mærket almindeligt |
 | `target` | `f` (MHz eller `null`), `src` | Målet vælges om undervejs |
 | `gain` | `from`, `to`, `why` | Gain skifter. `why` er `clip` eller `kraftigt` (beskyttelsen skruer ned), `tilbage` (op mod det valgte igen) eller `manuel` |
 | `ppm` | `to` | PPM-korrektionen ændres. Frekvenserne i de følgende poster ligger på den nye plads |

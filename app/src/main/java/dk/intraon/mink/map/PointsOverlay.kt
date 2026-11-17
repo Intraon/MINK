@@ -5,6 +5,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Point
 import dk.intraon.mink.core.Hub
+import dk.intraon.mink.core.MarkKind
 import dk.intraon.mink.direction.Bearing
 import dk.intraon.mink.ui.Ui
 import kotlin.math.max
@@ -132,16 +133,49 @@ class PointsOverlay(private val d: Float) : Overlay() {
         }
     }
 
+    /**
+     * Et mærke: et almindeligt er en hvid skive med flag og nummer, en mulig kilde en gul skive med spørgsmålstegn,
+     * og en fundet kilde en rød skive med hvid ring og prik. De to sidste har deres betydning skrevet ved siden af.
+     */
+    private fun drawMark(c: Canvas, x: Float, y: Float, m: Hub.Mark) {
+        p.style = Paint.Style.FILL
+        val label: String?
+        when (m.kind) {
+            MarkKind.FOUND -> {
+                p.color = 0xFF202124.toInt(); c.drawCircle(x, y, 14.5f * d, p)
+                p.color = Ui.RED; c.drawCircle(x, y, 13 * d, p)
+                p.style = Paint.Style.STROKE; p.strokeWidth = 2.5f * d; p.color = 0xFFFFFFFF.toInt(); c.drawCircle(x, y, 7.5f * d, p)
+                p.style = Paint.Style.FILL; c.drawCircle(x, y, 2.8f * d, p)
+                label = "kilde fundet"
+            }
+            MarkKind.POSSIBLE -> {
+                p.color = 0xFF202124.toInt(); c.drawCircle(x, y, 13.5f * d, p)
+                p.color = Ui.YELLOW; c.drawCircle(x, y, 12 * d, p)
+                p.color = 0xFF202124.toInt(); p.textSize = 16 * d; p.isFakeBoldText = true
+                c.drawText("?", x - p.measureText("?") / 2, y + 5.5f * d, p); p.isFakeBoldText = false
+                label = "mulig kilde"
+            }
+            else -> {
+                p.color = 0xFFFFFFFF.toInt(); c.drawCircle(x, y, 10 * d, p)
+                p.color = 0xFF202124.toInt(); p.textSize = 13 * d
+                val flag = "⚑${m.n}"
+                c.drawText(flag, x - p.measureText(flag) / 2, y + 5 * d, p)
+                label = null
+            }
+        }
+        if (label != null) {
+            p.textSize = 12 * d
+            val tx = x + 18 * d; val w = p.measureText(label)
+            p.color = 0xD00E0F12.toInt(); c.drawRect(tx - 4 * d, y - 10 * d, tx + w + 4 * d, y + 8 * d, p)
+            p.color = 0xFFFFFFFF.toInt(); c.drawText(label, tx, y + 4 * d, p)
+        }
+    }
+
     private fun drawMarksAndMe(c: Canvas, mv: Projection) {
         drawBearings(c, mv)
-        p.textSize = 13 * d
         for (list in marks()) for (m in list) {
             px(mv, m.lat ?: continue, m.lon ?: continue)
-            p.style = Paint.Style.FILL; p.color = 0xFFFFFFFF.toInt()
-            c.drawCircle(pt.x.toFloat(), pt.y.toFloat(), 10 * d, p)
-            p.color = 0xFF202124.toInt()
-            val label = "⚑${m.n}"
-            c.drawText(label, pt.x - p.measureText(label) / 2, pt.y + 5 * d, p)
+            drawMark(c, pt.x.toFloat(), pt.y.toFloat(), m)
         }
         if (only != null) return
         val me = Hub.location ?: return

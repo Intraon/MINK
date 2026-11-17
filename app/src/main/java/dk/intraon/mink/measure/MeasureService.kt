@@ -22,6 +22,7 @@ import android.util.Log
 import dk.intraon.mink.BuildConfig
 import dk.intraon.mink.R
 import dk.intraon.mink.core.Hub
+import dk.intraon.mink.core.MarkKind
 import dk.intraon.mink.core.Settings
 import dk.intraon.mink.direction.Compass
 import dk.intraon.mink.dsp.BurstDetector
@@ -58,6 +59,7 @@ class MeasureService : Service() {
         const val ACTION_GAIN_SET = "gain="
         const val ACTION_BEARING = "bearing"
         const val EXTRA_PHOTO = "photo"
+        private const val EXTRA_KIND = "kind"
         const val ACTION_PPM = "ppm="
         const val EXTRA_PPM = "ppm"
         private const val EXTRA_HZ = "hz"
@@ -79,6 +81,12 @@ class MeasureService : Service() {
         fun sendGain(ctx: Context, db: Double, protect: Boolean) {
             if (!Hub.running) return
             ctx.startService(Intent(ctx, MeasureService::class.java).setAction(ACTION_GAIN_SET).putExtra(EXTRA_DB, db).putExtra(EXTRA_PROTECT, protect))
+        }
+
+        /** Sæt et mærke dér, hvor telefonen er. [kind] er en af typerne i MarkKind. */
+        fun sendMark(ctx: Context, kind: String) {
+            if (!Hub.running) return
+            ctx.startService(Intent(ctx, MeasureService::class.java).setAction(ACTION_MARK).putExtra(EXTRA_KIND, kind))
         }
 
         /** Gem en pejling. [photo] er navnet på det foto, kameraskærmen gemmer i galleriet sammen med den. */
@@ -162,7 +170,7 @@ class MeasureService : Service() {
                 if (!Hub.running) startMeasuring()
             }
             ACTION_STOP -> stopMeasuring()
-            ACTION_MARK -> mark()
+            ACTION_MARK -> mark(MarkKind.of(intent.getStringExtra(EXTRA_KIND)))
             ACTION_BEARING -> bearing(intent.getStringExtra(EXTRA_PHOTO))
             ACTION_GAIN_UP -> manualGain(+1)
             ACTION_GAIN_DOWN -> manualGain(-1)
@@ -559,14 +567,14 @@ class MeasureService : Service() {
         Hub.changed()
     }
 
-    private fun mark() {
+    private fun mark(kind: String) {
         if (!Hub.running) return
         val loc = freshLocation()
         val n = Hub.marks.size + 1
-        Hub.marks.add(Hub.Mark(System.currentTimeMillis(), loc?.latitude, loc?.longitude, n))
+        Hub.marks.add(Hub.Mark(System.currentTimeMillis(), loc?.latitude, loc?.longitude, n, kind))
         val o = JSONObject().put("type", "mark").put("t", iso(System.currentTimeMillis()))
         putLocation(o, loc, false)
-        record(o.put("n", n))
+        record(o.put("n", n).put("kind", kind))
         Hub.changed()
     }
 
