@@ -81,7 +81,7 @@ Historien hører til i commit-beskeden. Klasser og funktioner, hvis opgave ikke 
 ## Det må aldrig med i repoet
 
 - Signeringsnøgler, `keystore.properties` og adgangskoder.
-- Rigtige webhook-adresser, positioner og logfiler fra rigtige ture. Testdata bruger opdigtede koordinater.
+- Rigtige webhook-adresser, positioner og logfiler fra rigtige ture. Testdata bruger opdigtede koordinater. Eneste undtagelse er de tre optagelser `docs/billeder/tur-*.webp`, som ejeren selv har valgt at vise i README.
 - Byggeresultater (`dist/`, `build/`).
 
 ## Når du er i tvivl
