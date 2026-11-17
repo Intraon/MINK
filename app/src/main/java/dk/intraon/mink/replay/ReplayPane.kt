@@ -1,5 +1,8 @@
 package dk.intraon.mink.replay
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.net.Uri
 import android.view.Gravity
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -27,6 +30,7 @@ class ReplayPane(private val a: MainActivity, private val onPlace: (Replay.Fix?)
     private var replay: Replay? = null
     private var clips: IqClips? = null
     private var trip = ""
+    private var time = 0L
 
     /** Om en tur er åben. */
     val active get() = replay != null
@@ -65,7 +69,36 @@ class ReplayPane(private val a: MainActivity, private val onPlace: (Replay.Fix?)
 
     private fun name() { zoomBtn.text = view.zoomName() }
 
+    /**
+     * Vandfaldet, som det ses lige nu, med en bjælke under: turen, klokkeslættet i øverste kant og målets frekvens,
+     * og at vandfaldet er genskabt, med afstanden. Null, hvis ingen tur er åben, eller vandfaldet ikke har en størrelse.
+     */
+    fun picture(): Bitmap? {
+        val r = replay ?: return null
+        val w = view.width; val h = view.height
+        if (w <= 0 || h <= 0) return null
+        val dens = resources.displayMetrics.density
+        val bar = (48 * dens).toInt()
+        val bmp = Bitmap.createBitmap(w, h + bar, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        view.draw(c)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        p.color = Ui.BG; c.drawRect(0f, h.toFloat(), w.toFloat(), (h + bar).toFloat(), p)
+        val target = r.target.map { it.freqHz }.sorted().let { if (it.isEmpty()) "" else " · mål ${Ui.mhz(it[it.size / 2])} MHz" }
+        // en linje, der er for lang til billedet, skrives mindre i stedet for at blive skåret af
+        fun line(text: String, size: Float, color: Int, y: Float) {
+            p.color = color; p.textSize = size * dens
+            val room = w - 16 * dens
+            if (p.measureText(text) > room) p.textSize *= room / p.measureText(text)
+            c.drawText(text, 8 * dens, y, p)
+        }
+        line("MINK · tur $trip · ${clock.format(Date(time))}$target", 12f, Ui.TEXT, h + 19 * dens)
+        line("Genskabt fra turens log (${view.zoomName()}): udbruddene er de målte, støjen imellem blev ikke gemt.", 11f, Ui.DIM, h + 38 * dens)
+        return bmp
+    }
+
     private fun moved(time: Long) {
+        this.time = time
         val r = replay ?: return
         val level = view.levelAt(time)?.let { "niveau ${Ui.f1(it)} dB" } ?: "målet høres ikke"
         title.text = "$trip\n${clock.format(Date(time))} · $level"

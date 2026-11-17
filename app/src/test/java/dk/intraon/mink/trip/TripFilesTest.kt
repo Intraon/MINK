@@ -46,5 +46,8 @@ class TripFilesTest {
         assertFalse(TripFiles.inTrip(ofOld, newest, null))
         assertTrue("uden en tidligere tur på kortet hører det til den nyeste", TripFiles.inTrip(TripFiles.mapPictureName("20261117_130000", null), newest, null))
         assertTrue("kortet, der laves ved delingen, hører til sin tur", TripFiles.inTrip(TripFiles.tripMapName(old), old, "20261116_230110"))
+        val waterfall = TripFiles.replayPictureName("20261117_130000", old)
+        assertTrue("et billede af turens vandfald, taget i dag", TripFiles.inTrip(waterfall, old, "20261116_230110"))
+        assertFalse(TripFiles.inTrip(waterfall, newest, null))
     }
 }

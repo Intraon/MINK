@@ -322,8 +322,8 @@ class MainActivity : Activity() {
         mainBox.addView(replayPane, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         cameraPane = CameraPane(this)
         mainBox.addView(cameraPane, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
-        // Billede: i vandfaldet de seneste 30 sekunder som en figur, på kortet kortet, som det ses
-        figureBtn = button("Billede", 0xE6202124.toInt()) { if (tab == 1) saveMapPicture() else shareFigure() }.apply { textSize = 13f; setPadding(dp(12), 0, dp(12), 0) }
+        // Billede: i vandfaldet de seneste 30 sekunder som en figur; på kortet og i en tidligere turs vandfald det, der ses
+        figureBtn = button("Billede", 0xE6202124.toInt()) { if (tab == 1) saveMapPicture() else if (replayPane.active) saveReplayPicture() else shareFigure() }.apply { textSize = 13f; setPadding(dp(12), 0, dp(12), 0) }
         mainBox.addView(figureBtn, FrameLayout.LayoutParams(WRAP_CONTENT, dp(36), Gravity.BOTTOM or Gravity.END).apply { setMargins(dp(8), dp(8), dp(8), dp(34)) })
         col.addView(mainBox, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
         showTab(0)
@@ -354,8 +354,7 @@ class MainActivity : Activity() {
         val replay = replayPane.active
         waterfall.visibility = if (which == 0 && !replay) View.VISIBLE else View.GONE
         replayPane.visibility = if (which == 0 && replay) View.VISIBLE else View.GONE
-        // Billede laver en figur af det levende vandfald; der er ingen for en tidligere tur
-        figureBtn.visibility = if ((which == 0 && !replay) || which == 1) View.VISIBLE else View.GONE
+        figureBtn.visibility = if (which == 0 || which == 1) View.VISIBLE else View.GONE
         mapBoxView.visibility = if (which == 1) View.VISIBLE else View.GONE
         cameraPane.visibility = if (which == 2) View.VISIBLE else View.GONE
         if (which == 2) cameraPane.open() else cameraPane.close()
@@ -530,6 +529,20 @@ class MainActivity : Activity() {
             val saved = MapExport.save(this, bmp, TripFiles.mapPictureName(SimpleDateFormat("yyyyMMdd_HHmmss", Ui.DA).format(now), shown))
             runOnUiThread {
                 toast(if (saved == null) "Billedet kunne ikke gemmes" else "Kortet er gemt i galleriet (${FigureExport.DIR})")
+            }
+        }.start()
+    }
+
+    /** Gemmer vandfaldet for den åbne tur, som det ses, i galleriet. Billedet hører til den tur, det viser. */
+    private fun saveReplayPicture() {
+        val session = trips.getOrNull(tripIndex)?.let { TripFiles.stamp(it.name) }
+        val bmp = replayPane.picture()
+        if (bmp == null || session == null) { toast("Vandfaldet er ikke klar endnu"); return }
+        val now = SimpleDateFormat("yyyyMMdd_HHmmss", Ui.DA).format(Date())
+        Thread {
+            val saved = MapExport.save(this, bmp, TripFiles.replayPictureName(now, session))
+            runOnUiThread {
+                toast(if (saved == null) "Billedet kunne ikke gemmes" else "Vandfaldet er gemt i galleriet (${FigureExport.DIR})")
             }
         }.start()
     }
