@@ -32,6 +32,7 @@ Baggrunden står i artiklen [MINK finder forstyrrelser på en mesh-kanal](https:
 - **Styrke, pil og bip** for målet: tallet er dB over støjen, pilen viser, om du kommer tættere på, og tonen stiger med styrken.
 - **Log med position** for hver måling, og et punkt hvert 10. sekund for, om der var stille.
 - **Kort og varmekort**, også for tidligere ture. Kortet kan gemmes som billede.
+- **Se en tur igen**: en liste over ture, og turens vandfald genskabt fra loggen med det ægte signal i hvert udbrud.
 - **Bølgeformen** (IQ) af hvert signal gemmes, så modulation og bitrate kan undersøges bagefter.
 - **Donglens frekvensfejl** rettes med ét tryk ud fra trafikken på din egen kanal.
 - **Retningsantenne**: kompasretning på hver måling, kameravisning med farvebånd langs horisonten, og pejlinger som streger på kortet.
