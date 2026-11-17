@@ -77,7 +77,7 @@ class Updater(private val a: MainActivity) {
     }
 
     private fun offer(rel: Release) {
-        val notes = rel.notes.trim().let { if (it.length > 700) it.take(700) + " …" else it }
+        val notes = Releases.readable(rel.notes)
         AlertDialog.Builder(a)
             .setTitle("MINK ${rel.version} er udgivet")
             .setMessage("Du har ${BuildConfig.VERSION_NAME}." + (if (notes.isNotEmpty()) "\n\n$notes" else ""))

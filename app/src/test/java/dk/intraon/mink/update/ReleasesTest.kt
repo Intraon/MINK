@@ -38,6 +38,14 @@ class ReleasesTest {
         assertNull("forhåndsudgaver tilbydes ikke", Releases.parse("""{"tag_name":"v9.0.0","prerelease":true}"""))
     }
 
+    @Test fun noterneVisesUdenMarkdownOgAdresser() {
+        val fraGithub = "## What's Changed\n* Hold teksten fri af knappen by @nogen in https://github.com/Intraon/MINK/pull/2\n\n\n" +
+            "**Full Changelog**: https://github.com/Intraon/MINK/commits/v0.4.461392"
+        assertEquals("What's Changed\n• Hold teksten fri af knappen", Releases.readable(fraGithub))
+        val fraUdgiv = "Ændringer:\n\n- Ret `ppm` med [ét tryk](https://example.org/x)\n- Vis **retningen**\n"
+        assertEquals("Ændringer:\n\n• Ret ppm med ét tryk\n• Vis retningen", Releases.readable(fraUdgiv))
+    }
+
     @Test fun versionerSammenlignesSomTal() {
         assertTrue(Releases.newer("0.4.460900", "0.4.460694"))
         assertTrue("0.10 er nyere end 0.9", Releases.newer("0.10.1", "0.9.999999"))
