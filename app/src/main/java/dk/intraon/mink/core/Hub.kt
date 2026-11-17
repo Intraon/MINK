@@ -92,6 +92,12 @@ object Hub {
     /** Målets styrke pr. retning fra det sted, man står. */
     val rose = Rose()
     val bearings = CopyOnWriteArrayList<BearingLine>()
+    /** En pejling, appen selv har gemt for et sted: stedet, pejlingens nummer og fotoets navn (null = intet foto). */
+    class AutoBearing(val stop: Rose.Stop, val n: Int, val photo: String?)
+    /** Den seneste pejling, appen selv har gemt. Kameraskærmen gemmer fotoet til den. */
+    @Volatile var autoBearing: AutoBearing? = null
+    /** Tidspunktet for den måling, kameraskærmen holder et kamerabillede af; 0 = intet. */
+    @Volatile var heldFrameAt = 0L
 
     /** Retningen, hvis kompasset har meldt sig inden for det seneste sekund. */
     fun freshHeading(now: Long = System.currentTimeMillis()): Double? = headingDeg?.takeIf { now - headingAt < 1000 }
@@ -111,6 +117,7 @@ object Hub {
 
     fun reset() {
         bursts.clear(); silent.clear(); marks.clear(); gainSteps.clear(); bearings.clear(); rose.reset()
+        autoBearing = null; heldFrameAt = 0L
         lastBurst = null; trendDelta = null; trendUncertain = false; floorDb = null; intervalMs = null
         sent = 0; queued = 0; uploadError = null; clipPct = 0.0; logOk = true
         sessionStart = System.currentTimeMillis()

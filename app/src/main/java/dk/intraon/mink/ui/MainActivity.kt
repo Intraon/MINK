@@ -621,6 +621,8 @@ class MainActivity : Activity() {
 
     private fun render() {
         val now = System.currentTimeMillis()
+        // en pejling, appen selv har gemt, skal have sit foto, også når kameraskærmen ikke er fremme
+        cameraPane.autoSaved()
         val running = Hub.running
         if (!running) checkHardware(now)
 

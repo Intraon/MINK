@@ -25,6 +25,7 @@ import dk.intraon.mink.core.Hub
 import dk.intraon.mink.core.MarkKind
 import dk.intraon.mink.core.Settings
 import dk.intraon.mink.direction.Compass
+import dk.intraon.mink.direction.Rose
 import dk.intraon.mink.dsp.BurstDetector
 import dk.intraon.mink.dsp.IqRing
 import dk.intraon.mink.radio.GainControl
@@ -58,6 +59,7 @@ class MeasureService : Service() {
         const val ACTION_TARGET = "target"
         const val ACTION_GAIN_SET = "gain="
         const val ACTION_BEARING = "bearing"
+        const val ACTION_PLACE = "place"
         const val EXTRA_PHOTO = "photo"
         private const val EXTRA_KIND = "kind"
         const val ACTION_PPM = "ppm="
@@ -93,6 +95,12 @@ class MeasureService : Service() {
         fun sendBearing(ctx: Context, photo: String?) {
             if (!Hub.running) return
             ctx.startService(Intent(ctx, MeasureService::class.java).setAction(ACTION_BEARING).putExtra(EXTRA_PHOTO, photo))
+        }
+
+        /** Kameraskærmen forlades: gem stedets stærkeste retning som pejling, hvis stedet er en værd. */
+        fun sendPlaceDone(ctx: Context) {
+            if (!Hub.running) return
+            ctx.startService(Intent(ctx, MeasureService::class.java).setAction(ACTION_PLACE))
         }
 
         /** Ny PPM-korrektion, mens der måles: gælder med det samme. */
@@ -172,6 +180,7 @@ class MeasureService : Service() {
             ACTION_STOP -> stopMeasuring()
             ACTION_MARK -> mark(MarkKind.of(intent.getStringExtra(EXTRA_KIND)))
             ACTION_BEARING -> bearing(intent.getStringExtra(EXTRA_PHOTO))
+            ACTION_PLACE -> placeDone()
             ACTION_GAIN_UP -> manualGain(+1)
             ACTION_GAIN_DOWN -> manualGain(-1)
             ACTION_GAIN_SET -> chooseGain(intent.getDoubleExtra(EXTRA_DB, Double.NaN), intent.getBooleanExtra(EXTRA_PROTECT, true))
@@ -290,6 +299,7 @@ class MeasureService : Service() {
 
     private fun stopMeasuring() {
         if (!Hub.running) { stopSelf(); return }
+        placeDone()
         Hub.running = false
         client?.stop(); client = null
         compass?.stop()
@@ -381,16 +391,20 @@ class MeasureService : Service() {
             .put("gain", gainDb).put("floor", r1(b.floorDb)).put("dur", b.durMs).put("clip", r1(b.clipPct))
         b.bwHz?.let { o.put("bw", it.roundToInt()) }
         // med retningsantenne: hvilken vej telefonen (og dermed antennen) pegede, og ind i rosen for stedet
+        var left: Rose.Stop? = null
+        val held = Hub.heldFrameAt
         if (Hub.directional) Hub.freshHeading()?.let { hdg ->
             o.put("hdg", r1(hdg)).put("tilt", r1(Hub.tiltDeg))
             // et kompas, der ikke er til at stole på, mærkes i loggen og får ikke lov at farve rosen
             if (Hub.compassPoor) o.put("hdg_poor", true)
-            else if (isTarget) Hub.rose.add(hdg, level, loc?.latitude, loc?.longitude)
+            else if (isTarget) left = Hub.rose.add(hdg, level, loc?.latitude, loc?.longitude, t = b.tStartMs)
         }
         if (isTarget) o.put("tgt", true)
         if (b.ongoing || b.part > 0) o.put("cont", true)
         saveClip(b, o)
         record(o)
+        // målingen blev taget et nyt sted: det sted, brugeren forlod, bliver til en pejling
+        left?.let { autoBearing(it, held) }
         burstsInTick++
         if (b.peakDbfs > (strongestAny ?: -999.0)) strongestAny = b.peakDbfs
         Hub.sources = tr.snapshot()
@@ -564,6 +578,32 @@ class MeasureService : Service() {
             .put("flat", Hub.flat).put("photo", photo?.let { "${FigureExport.DIR}/$it" } ?: JSONObject.NULL)
         Hub.rose.best()?.let { o.put("best", r1(it)) }
         record(o)
+        Hub.changed()
+    }
+
+    /** Stedet er færdigt (kameraskærmen forlades, eller målingen stoppes): gem dets pejling, hvis det er en værd. */
+    private fun placeDone() {
+        if (!Hub.running) return
+        val held = Hub.heldFrameAt
+        Hub.rose.finish()?.let { autoBearing(it, held) }
+    }
+
+    /**
+     * Gemmer et steds stærkeste retning som pejling, uden at brugeren har trykket: stedet og retningen kommer fra
+     * rosen, niveauet er stedets stærkeste måling. [held] er tidspunktet for den måling, kameraskærmen holdt et
+     * billede af, da stedet blev afleveret; er det stedets stærkeste, får pejlingen et foto, som skærmen gemmer.
+     */
+    private fun autoBearing(stop: Rose.Stop, held: Long) {
+        val now = System.currentTimeMillis()
+        val n = Hub.bearings.size + 1
+        val photo = if (held != 0L && held == stop.at) "MINK_pejling_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date(stop.at)) + ".jpg" else null
+        Hub.bearings.add(Hub.BearingLine(now, stop.lat, stop.lon, stop.best, stop.level, n))
+        val o = JSONObject().put("type", "bearing").put("t", iso(now))
+            .put("lat", (stop.lat * 1e6).roundToInt() / 1e6).put("lon", (stop.lon * 1e6).roundToInt() / 1e6)
+            .put("hdg", r1(stop.best)).put("lvl", r1(stop.level)).put("best", r1(stop.best)).put("n", n).put("auto", true)
+            .put("photo", photo?.let { "${FigureExport.DIR}/$it" } ?: JSONObject.NULL)
+        record(o)
+        Hub.autoBearing = Hub.AutoBearing(stop, n, photo)
         Hub.changed()
     }
 
