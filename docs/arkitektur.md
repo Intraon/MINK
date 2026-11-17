@@ -38,7 +38,7 @@ Kildekoden ligger i `app/src/main/java/dk/intraon/mink/`, én mappe pr. komponen
 | `core/` | Det, alle deler: tilstanden mellem måling og skærm, brugerens indstillinger og mærkernes typer | `MarkKind` | `Hub`, `Settings` |
 | `waterfall/` | Vandfaldets data og visning, og målebilledet | `Scope`, `Figure`, `Pen` | `WaterfallView`, `CanvasPen`, `FigureExport` |
 | `map/` | Kortlaget, varmekortet og tidligere ture på kortet | `HeatGrid`, `TripPoints` | `PointsOverlay`, `MapData`, `MapExport` |
-| `direction/` | Retningsantenne: retninger, roset, kompas og kameraskærm | `Bearing`, `Rose`, `CompassCheck`, `HeadingFilter`, `FlatLayout` | `Compass`, `CameraPane` |
+| `direction/` | Retningsantenne: retninger, roset, kompas og kameraskærm | `Bearing`, `Rose`, `CompassCheck`, `HeadingFilter`, `FlatLayout`, `CameraWatch` | `Compass`, `CameraPane` |
 | `trip/` | Turens filer: log, bølgeform, hvilke filer der hører til en tur, og deling | `TripFiles`, `ZipPack` | `JsonlLog`, `IqWav`, `Export`, `TripShare` |
 | `update/` | Opdatering fra GitHub-udgivelser | `Releases` | `Updater` |
 | `ui/` | Hovedskærmen, indstillingerne, vejledningen, grafen og fælles farver | – | `MainActivity`, `SettingsScreen`, `Guide`, `LevelGraphView`, `Ui` |

@@ -18,7 +18,8 @@ import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.os.Handler
-import android.os.HandlerThread
+import android.os.Looper
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Size
 import android.view.Gravity
@@ -55,8 +56,12 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
     private val overlay = Overlay(a)
     private val compass = Compass(a, motion = true)
     private var calDialog: AlertDialog? = null
-    private var thread: HandlerThread? = null
-    private var handler: Handler? = null
+    /** Kameraets tilbagemeldinger kommer på hovedtråden, så de ikke kan krydse en ændring af billedets størrelse. */
+    private val main = Handler(Looper.getMainLooper())
+    private val watch = CameraWatch()
+    /** Tæller op, hver gang kameraet startes eller stoppes; en tilbagemelding fra et ældre forsøg kendes på sit tal. */
+    private var run = 0
+    private var starting = false
     private var device: CameraDevice? = null
     private var session: CameraCaptureSession? = null
     private var preview = Size(1280, 720)
@@ -66,7 +71,9 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
     /** Kamerabilledets størrelse på skærmen. Det er mindst lige så stort som feltet og beskæres i kanten. */
     private var texW = 0
     private var texH = 0
-    @Volatile private var error: String? = null
+    private var error: String? = null
+    /** Sat, når der ikke er et kamera at prøve igen med. */
+    private var hopeless = false
     private var wanted = false
 
     init {
@@ -82,9 +89,13 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
         addView(pick, LayoutParams(WRAP_CONTENT, (34 * d).toInt(), Gravity.BOTTOM or Gravity.END).apply { bottomMargin = (21 * d).toInt(); rightMargin = (8 * d).toInt() })
         texture.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) { if (wanted) startCamera() }
-            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
-            override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean { stopCamera(); return true }
-            override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+            // Når feltet skifter størrelse, sætter Android billedets størrelse til feltets. Kameraet kan kun levere
+            // sine egne størrelser, så dets størrelse sættes tilbage med det samme.
+            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {
+                if (starting || device != null) st.setDefaultBufferSize(preview.width, preview.height)
+            }
+            override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean { stopCamera(); watch.stopped(); return true }
+            override fun onSurfaceTextureUpdated(st: SurfaceTexture) { watch.frame(SystemClock.elapsedRealtime()) }
         }
     }
 
@@ -97,7 +108,7 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
             a.requestPermissions(arrayOf(Manifest.permission.CAMERA), MainActivity.REQ_CAMERA)
             return
         }
-        if (texture.isAvailable && device == null) startCamera()
+        if (texture.isAvailable) startCamera()
         // første gang i denne omgang: kompasset skal kalibreres, før retningerne er noget værd
         if (!Hub.compassCalibrated && compass.available) calibrate()
     }
@@ -152,6 +163,8 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
         compass.stop()
         overlay.pause()
         stopCamera()
+        watch.stopped()
+        if (!hopeless) error = null
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -171,13 +184,15 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
 
     @SuppressLint("MissingPermission")
     private fun startCamera() {
-        if (device != null || thread != null) return
-        error = null
+        if (device != null || starting || hopeless) return
+        val mine = ++run
+        starting = true
+        watch.started(SystemClock.elapsedRealtime())
         try {
             val cm = a.getSystemService(Context.CAMERA_SERVICE) as CameraManager
             val id = cm.cameraIdList.firstOrNull { cm.getCameraCharacteristics(it).get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK }
                 ?: cm.cameraIdList.firstOrNull()
-            if (id == null) { error = "Telefonen har intet kamera"; return }
+            if (id == null) { starting = false; hopeless = true; watch.stopped(); error = "Telefonen har intet kamera"; return }
             val ch = cm.getCameraCharacteristics(id)
             val sizes = ch.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)?.getOutputSizes(SurfaceTexture::class.java)?.toList().orEmpty()
             preview = sizes.filter { it.width <= 1920 && it.width * 9 == it.height * 16 }.maxByOrNull { it.width }
@@ -193,48 +208,58 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
                 vfov = Math.toDegrees(2 * atan(long / (2.0 * f)))
             }
             fitTexture()
-            val t = HandlerThread("mink-kamera").also { it.start() }
-            thread = t; handler = Handler(t.looper)
             cm.openCamera(id, object : CameraDevice.StateCallback() {
                 override fun onOpened(cam: CameraDevice) {
                     // skærmen kan være forladt, mens kameraet var ved at åbne
-                    if (!wanted) { cam.close(); return }
-                    device = cam; startPreview(cam)
+                    if (mine != run || !wanted) { cam.close(); return }
+                    starting = false; device = cam; startPreview(cam, mine)
                 }
-                override fun onDisconnected(cam: CameraDevice) { cam.close(); device = null }
-                override fun onError(cam: CameraDevice, code: Int) { cam.close(); device = null; error = "Kameraet kunne ikke åbnes (fejl $code)" }
-            }, handler)
+                override fun onDisconnected(cam: CameraDevice) { cam.close(); if (mine == run) fail("Kameraet kunne ikke åbnes") }
+                override fun onError(cam: CameraDevice, code: Int) { cam.close(); if (mine == run) fail("Kameraet kunne ikke åbnes (fejl $code)") }
+            }, main)
         } catch (_: SecurityException) {
-            error = "MINK har ikke adgang til kameraet"
+            fail("MINK har ikke adgang til kameraet")
         } catch (_: Exception) {
-            error = "Kameraet kunne ikke åbnes"
+            fail("Kameraet kunne ikke åbnes")
         }
     }
 
-    private fun startPreview(cam: CameraDevice) {
+    private fun startPreview(cam: CameraDevice, mine: Int) {
         try {
-            val st = texture.surfaceTexture ?: return
+            val st = texture.surfaceTexture
+            if (st == null) { fail("Kameraet kunne ikke vise billedet"); return }
             st.setDefaultBufferSize(preview.width, preview.height)
             val surface = Surface(st)
             val req = cam.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply { addTarget(surface) }
             @Suppress("DEPRECATION")
             cam.createCaptureSession(listOf(surface), object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(s: CameraCaptureSession) {
+                    if (mine != run) return
                     session = s
-                    try { s.setRepeatingRequest(req.build(), null, handler) } catch (_: Exception) { error = "Kameraet kunne ikke vise billedet" }
+                    try { s.setRepeatingRequest(req.build(), null, main) } catch (_: Exception) { fail("Kameraet kunne ikke vise billedet") }
                 }
-                override fun onConfigureFailed(s: CameraCaptureSession) { error = "Kameraet kunne ikke vise billedet" }
-            }, handler)
+                override fun onConfigureFailed(s: CameraCaptureSession) { if (mine == run) fail("Kameraet kunne ikke vise billedet") }
+            }, main)
         } catch (_: Exception) {
-            error = "Kameraet kunne ikke vise billedet"
+            fail("Kameraet kunne ikke vise billedet")
         }
     }
 
+    /**
+     * Et forsøg på at få kameraet i gang mislykkedes: kameraet lukkes, og [watch] bestemmer, hvornår der prøves igen.
+     * [message] vises først, når flere forsøg i træk er slået fejl.
+     */
+    private fun fail(message: String) {
+        stopCamera()
+        watch.failed(SystemClock.elapsedRealtime())
+        error = if (watch.givenUp) message else null
+    }
+
     private fun stopCamera() {
+        run++
         try { session?.close() } catch (_: Exception) {}
         try { device?.close() } catch (_: Exception) {}
-        session = null; device = null
-        thread?.quitSafely(); thread = null; handler = null
+        session = null; device = null; starting = false
     }
 
     /** Gemmer pejlingen i loggen (og dermed på kortet) og et foto med retning og styrke i galleriet. */
@@ -296,9 +321,12 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
 
         override fun onDraw(c: Canvas) {
             // ligger telefonen fladt, er kameraet ikke til nogen nytte: det slukkes, og tændes igen på højkant
-            if (Hub.flat) { if (device != null) stopCamera() }
-            else if (wanted && device == null && thread == null && texture.isAvailable && error == null &&
-                a.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startCamera()
+            val t = SystemClock.elapsedRealtime()
+            if (Hub.flat) { if (device != null || starting) { stopCamera(); watch.stopped() } }
+            else if (wanted && texture.isAvailable && a.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                if (watch.stalled(t)) fail("Kameraet kunne ikke vise billedet")
+                else if (!hopeless && watch.mayStart(t)) startCamera()
+            }
             paint(c, width, height, Hub.freshHeading(), Hub.tiltDeg, System.currentTimeMillis())
         }
 
