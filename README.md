@@ -29,7 +29,7 @@ Den gør en Android-telefon og en RTL-SDR til et håndholdt instrument, der find
 - **Vandfald** over hele det lyttede bånd, med din egen kanal markeret. Tryk på et signal for at gøre det til målet.
 - **Styrke, pil og bip** for målet: tallet er dB over støjen, pilen viser, om du kommer tættere på, og tonen stiger med styrken.
 - **Log med position** for hver måling, og et punkt hvert 10. sekund for, om der var stille.
-- **Kort og varmekort**, også for tidligere ture.
+- **Kort og varmekort**, også for tidligere ture. Kortet kan gemmes som billede.
 - **Bølgeformen** (IQ) af hvert signal gemmes, så modulation og bitrate kan undersøges bagefter.
 - **Donglens frekvensfejl** rettes med ét tryk ud fra trafikken på din egen kanal.
 - **Retningsantenne**: kompasretning på hver måling, kameravisning med farvebånd langs horisonten, og pejlinger som streger på kortet.
@@ -63,7 +63,7 @@ Første gang viser appen en kort vejledning; den ligger også bag **?** ved fane
 | Mappe | Indhold |
 |---|---|
 | `Download/mink/` | Turens log (`mink_<tid>.jsonl.txt`), bølgeformen (`mink_<tid>.iq.wav`) og zip-filer fra **Del** |
-| `Pictures/MINK/` | Målebilleder og pejlingsfotos |
+| `Pictures/MINK/` | Målebilleder, kortbilleder og pejlingsfotos |
 
 Formaterne er beskrevet i [docs/logformat.md](docs/logformat.md).
 

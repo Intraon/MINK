@@ -9,7 +9,7 @@ import dk.intraon.mink.direction.Bearing
 import dk.intraon.mink.ui.Ui
 import kotlin.math.max
 import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
+import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.Overlay
 
 /**
@@ -24,6 +24,11 @@ private const val BEARING_M = 3_000.0
 
 class PointsOverlay(private val d: Float) : Overlay() {
     var heat = false
+    /**
+     * Sat: laget tegner kun disse punkter og ikke telefonens egen position. Bruges til et kortbillede af én tur.
+     * Ellers tegnes de indlæste ture sammen med den tur, der kører.
+     */
+    var only: TripPoints? = null
     /** Tekst til forklaringen under kortet; sættes hver gang varmekortet tegnes. */
     @Volatile var heatLegend = ""
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -33,25 +38,30 @@ class PointsOverlay(private val d: Float) : Overlay() {
     private var grid: HeatGrid? = null
     private var gridStamp = -1L
 
-    override fun draw(c: Canvas, mv: MapView, shadow: Boolean) {
-        if (shadow) return
+    override fun draw(c: Canvas, mv: Projection) {
         if (heat) drawHeat(c, mv) else drawPoints(c, mv)
         drawMarksAndMe(c, mv)
     }
 
-    private fun px(mv: MapView, lat: Double, lon: Double, into: Point = pt) {
-        gp.setCoords(lat, lon); mv.projection.toPixels(gp, into)
+    private fun px(mv: Projection, lat: Double, lon: Double, into: Point = pt) {
+        gp.setCoords(lat, lon); mv.toPixels(gp, into)
     }
 
-    private fun drawPoints(c: Canvas, mv: MapView) {
+    private fun bursts() = only?.let { listOf(it.bursts) } ?: listOf(MapData.bursts, Hub.bursts)
+    private fun silent() = only?.let { listOf(it.silent) } ?: listOf(MapData.silent, Hub.silent)
+    private fun marks() = only?.let { listOf(it.marks) } ?: listOf(MapData.marks, Hub.marks)
+    private fun bearings() = only?.let { listOf(it.bearings) } ?: listOf(MapData.bearings, Hub.bearings)
+
+    private fun drawPoints(c: Canvas, mv: Projection) {
         p.style = Paint.Style.FILL
         p.color = 0xCC6B7078.toInt()
-        for (list in listOf(MapData.silent, Hub.silent)) for (s in list) {
+        for (list in silent()) for (s in list) {
             px(mv, s.lat ?: continue, s.lon ?: continue)
             c.drawCircle(pt.x.toFloat(), pt.y.toFloat(), 3 * d, p)
         }
-        val range = MapData.range()
-        for (list in listOf(MapData.bursts, Hub.bursts)) for (b in list) {
+        val o = only
+        val range = if (o != null) o.range() else MapData.range()
+        for (list in bursts()) for (b in list) {
             px(mv, b.lat ?: continue, b.lon ?: continue)
             p.style = Paint.Style.FILL; p.color = Hub.colorFor(b.level ?: continue, range)
             c.drawCircle(pt.x.toFloat(), pt.y.toFloat(), 7 * d, p)
@@ -60,20 +70,19 @@ class PointsOverlay(private val d: Float) : Overlay() {
         }
     }
 
-    private fun drawHeat(c: Canvas, mv: MapView) {
+    private fun drawHeat(c: Canvas, mv: Projection) {
         // meter pr. pixel midt på kortet: 0,1 breddegrad er 11,12 km
-        val center = mv.mapCenter
+        val center = mv.currentCenter
         px(mv, center.latitude, center.longitude); px(mv, center.latitude + 0.1, center.longitude, pt2)
         val mpp = 11_120.0 / max(1, kotlin.math.abs(pt2.y - pt.y))
         val size = HeatGrid.sizeFor(mpp * 26 * d)
 
-        val stamp = MapData.bursts.size * 7L + MapData.silent.size * 5L + Hub.bursts.size * 3L + Hub.silent.size + MapData.sessions * 1_000_003L
+        val stamp = bursts().sumOf { it.size } * 7L + silent().sumOf { it.size } * 5L + MapData.sessions * 1_000_003L
         var g = grid
         if (g == null || g.sizeM != size || stamp != gridStamp) {
-            val first = MapData.bursts.firstOrNull { it.lat != null } ?: Hub.bursts.firstOrNull { it.lat != null }
-                ?: MapData.silent.firstOrNull { it.lat != null } ?: Hub.silent.firstOrNull { it.lat != null }
+            val first = (bursts() + silent()).firstNotNullOfOrNull { list -> list.firstOrNull { it.lat != null } }
             g = HeatGrid(size, kotlin.math.round(first?.lat ?: center.latitude))
-            for (list in listOf(MapData.bursts, Hub.bursts, MapData.silent, Hub.silent)) for (q in list) {
+            for (list in bursts() + silent()) for (q in list) {
                 g.add(q.lat ?: continue, q.lon ?: continue, q.level)
             }
             grid = g; gridStamp = stamp
@@ -109,8 +118,8 @@ class PointsOverlay(private val d: Float) : Overlay() {
     }
 
     /** Gemte pejlinger: en streg på [BEARING_M] meter fra stedet i den retning, antennen pegede. */
-    private fun drawBearings(c: Canvas, mv: MapView) {
-        for (list in listOf(MapData.bearings, Hub.bearings)) for (b in list) {
+    private fun drawBearings(c: Canvas, mv: Projection) {
+        for (list in bearings()) for (b in list) {
             val lat = b.lat ?: continue; val lon = b.lon ?: continue
             px(mv, lat, lon)
             val x0 = pt.x.toFloat(); val y0 = pt.y.toFloat()
@@ -123,10 +132,10 @@ class PointsOverlay(private val d: Float) : Overlay() {
         }
     }
 
-    private fun drawMarksAndMe(c: Canvas, mv: MapView) {
+    private fun drawMarksAndMe(c: Canvas, mv: Projection) {
         drawBearings(c, mv)
         p.textSize = 13 * d
-        for (list in listOf(MapData.marks, Hub.marks)) for (m in list) {
+        for (list in marks()) for (m in list) {
             px(mv, m.lat ?: continue, m.lon ?: continue)
             p.style = Paint.Style.FILL; p.color = 0xFFFFFFFF.toInt()
             c.drawCircle(pt.x.toFloat(), pt.y.toFloat(), 10 * d, p)
@@ -134,6 +143,7 @@ class PointsOverlay(private val d: Float) : Overlay() {
             val label = "⚑${m.n}"
             c.drawText(label, pt.x - p.measureText(label) / 2, pt.y + 5 * d, p)
         }
+        if (only != null) return
         val me = Hub.location ?: return
         px(mv, me.latitude, me.longitude)
         val x = pt.x.toFloat(); val y = pt.y.toFloat()

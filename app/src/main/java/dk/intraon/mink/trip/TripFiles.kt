@@ -26,12 +26,27 @@ object TripFiles {
     const val SHARE_WAVE = 1
     const val SHARE_ALL = 2
 
-    /** De trin, en tur kan deles på: altid loggen alene; med bølgeform, hvis turen har én; det hele, hvis den har billeder. */
-    fun shareLevels(hasWave: Boolean, hasPics: Boolean): List<Int> =
-        listOfNotNull(SHARE_LOG, SHARE_WAVE.takeIf { hasWave }, SHARE_ALL.takeIf { hasPics })
+    /**
+     * De trin, en tur kan deles på: loggen alene, med bølgeform, hvis turen har én, og det hele. Det hele findes
+     * altid, fordi kortet over turen laves, når den deles.
+     */
+    fun shareLevels(hasWave: Boolean): List<Int> = listOfNotNull(SHARE_LOG, SHARE_WAVE.takeIf { hasWave }, SHARE_ALL)
 
     /** Det trin, dialogen står på: det, der blev valgt sidst, eller det højeste under det, som turen har filer til. */
     fun shareLevel(remembered: Int, levels: List<Int>): Int = levels.lastOrNull { it <= remembered } ?: SHARE_LOG
+
+    /**
+     * Navnet på et kortbillede taget [now] ("20261117_130000"). Viser kortet én tidligere tur, står dens tidsstempel
+     * ([shown]) først i navnet, så billedet hører til den tur og ikke til den, der er den nyeste, mens billedet tages.
+     */
+    fun mapPictureName(now: String, shown: String?): String =
+        if (shown == null) "MINK_kort_$now.png" else "MINK_kort_${shown}_$now.png"
+
+    /**
+     * Navnet på det kort over hele turen [session], som laves, når turen deles. Der er ét pr. tur; deles turen
+     * igen, erstattes det.
+     */
+    fun tripMapName(session: String): String = "MINK_kort_$session.png"
 
     /** "16.11.2026 kl. 22.37" ud af et filnavn med tidsstempel; navnet selv, hvis det ikke har et. */
     fun title(name: String): String {
