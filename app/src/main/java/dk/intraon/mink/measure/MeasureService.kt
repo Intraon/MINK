@@ -622,7 +622,7 @@ class MeasureService : Service() {
         )
         val noIcon: Icon? = null
         return Notification.Builder(this, CHANNEL)
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
+            .setSmallIcon(R.drawable.ic_stat_mink)
             .setContentTitle("MINK måler")
             .setContentText(text)
             .setOngoing(true)
