@@ -17,7 +17,7 @@ object TripShare {
         val items = arrayOf(
             if (iq.isEmpty()) "Bølgeform (IQ) · ingen gemt" else "Bølgeform (IQ) · ${TripFiles.size(iq.sumOf { it.bytes })}",
             if (pics.isEmpty()) "Billeder · ingen taget" else "Billeder · ${pics.size} stk., ${TripFiles.size(pics.sumOf { it.bytes })}",
-            "Pak det hele i én zip-fil",
+            "Pak de valgte filer i én zip-fil",
         )
         val on = booleanArrayOf(a.settings.shareIq, a.settings.sharePics, a.settings.shareZip)
         val b = AlertDialog.Builder(a)
@@ -27,17 +27,28 @@ object TripShare {
                 a.settings.shareIq = on[0]; a.settings.sharePics = on[1]; a.settings.shareZip = on[2]
                 val files = chosen + (if (on[0]) iq else emptyList()) + (if (on[1]) pics else emptyList())
                 if (!on[2]) { Export.share(a, files.map { it.uri }, if (files.size == 1) "text/plain" else "*/*"); return@setPositiveButton }
-                a.toast("Pakker ${files.size} filer …")
+                a.toast("Pakker ${contents(chosen.size, if (on[0]) iq.size else 0, if (on[1]) pics.size else 0)} …")
                 val name = if (sessions.size == 1) "mink_${sessions[0]}.zip" else "mink_${sessions.size}_ture_${sessions.maxOrNull()}.zip"
                 Thread {
-                    val uri = Export.zip(a, name, files)
+                    val zip = Export.zip(a, name, files)
                     a.runOnUiThread {
-                        if (uri == null) a.toast("Zip-filen kunne ikke skrives") else Export.share(a, listOf(uri), "application/zip")
+                        if (zip == null) { a.toast("Zip-filen kunne ikke skrives"); return@runOnUiThread }
+                        if (zip.unread.isNotEmpty()) a.toast("Kunne ikke læse ${zip.unread.joinToString(", ")}. Resten er pakket.")
+                        Export.share(a, listOf(zip.uri), "application/zip")
                     }
                 }.start()
             }
             .setNegativeButton("Annullér", null)
         if (offerOlder) b.setNeutralButton("Tidligere ture …") { _, _ -> a.sessionsDialog() }
         b.show()
+    }
+
+    /** "loggen, bølgeformen og 2 billeder": det, der er valgt til zippen, sagt i ord. */
+    private fun contents(logs: Int, iq: Int, pics: Int): String {
+        val parts = ArrayList<String>()
+        parts.add(if (logs == 1) "loggen" else "$logs logge")
+        if (iq > 0) parts.add(if (iq == 1) "bølgeformen" else "$iq bølgeformer")
+        if (pics > 0) parts.add(if (pics == 1) "1 billede" else "$pics billeder")
+        return if (parts.size == 1) parts[0] else parts.dropLast(1).joinToString(", ") + " og " + parts.last()
     }
 }

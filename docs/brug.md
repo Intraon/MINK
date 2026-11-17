@@ -85,7 +85,7 @@ Knappen **Billede** i vandfaldet gemmer en figur af de seneste 30 sekunder i gal
 
 ## Del
 
-Et tryk på **Del** åbner en dialog for den seneste tur. Loggen er altid med, og du krydser af, om bølgeformen og turens billeder skal følge med, og om det hele skal pakkes i én zip-fil. Derefter åbner Androids delemenu. Appen skriver ingen tekst for dig, og valgene huskes til næste gang.
+Et tryk på **Del** åbner en dialog for den seneste tur. Loggen er altid med, og du krydser af, om bølgeformen og turens billeder skal følge med, og om det hele skal pakkes i én zip-fil. Derefter åbner Androids delemenu. Appen siger, hvad den pakker, og hvis en fil ikke kan læses, nævner den filen og pakker resten. Appen skriver ingen tekst for dig, og valgene huskes til næste gang.
 
 **Tidligere ture** i samme dialog, eller et langt tryk på Del, lader dig vælge en eller flere ældre ture, vise dem på kortet eller dele dem.
 

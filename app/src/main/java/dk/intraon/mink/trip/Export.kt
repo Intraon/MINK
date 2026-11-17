@@ -8,8 +8,6 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
 import dk.intraon.mink.waterfall.FigureExport
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 /** Del logfiler eller et billede via Androids delemenu. */
 object Export {
@@ -47,11 +45,14 @@ object Export {
         return res
     }
 
+    /** En skrevet zip-fil og navnene på de filer, der ikke kunne læses og derfor mangler i den. */
+    class Zipped(val uri: Uri, val unread: List<String>)
+
     /**
-     * Pakker filerne i én zip-fil i appens mappe i Overførsler og returnerer den (kald fra en baggrundstråd).
-     * En ældre zip med samme navn erstattes. Null, hvis den ikke kunne skrives.
+     * Pakker filerne i én zip-fil i appens mappe i Overførsler (kald fra en baggrundstråd). En ældre zip med samme
+     * navn erstattes. Null, hvis zip-filen ikke kunne skrives.
      */
-    fun zip(ctx: Context, name: String, files: List<JsonlLog.Entry>): Uri? {
+    fun zip(ctx: Context, name: String, files: List<JsonlLog.Entry>): Zipped? {
         val dl = MediaStore.Downloads.EXTERNAL_CONTENT_URI
         try { ctx.contentResolver.delete(dl, "${MediaStore.Downloads.DISPLAY_NAME}=?", arrayOf(name)) } catch (_: Exception) {}
         return try {
@@ -62,15 +63,7 @@ object Export {
             }
             val uri = ctx.contentResolver.insert(dl, values) ?: return null
             val out = ctx.contentResolver.openOutputStream(uri) ?: return null
-            ZipOutputStream(out.buffered()).use { z ->
-                for (f in files) {
-                    val inp = try { ctx.contentResolver.openInputStream(f.uri) } catch (_: Exception) { null } ?: continue
-                    z.putNextEntry(ZipEntry(f.name))
-                    inp.use { it.copyTo(z) }
-                    z.closeEntry()
-                }
-            }
-            uri
+            Zipped(uri, ZipPack.write(out, files.map { f -> ZipPack.Source(f.name) { ctx.contentResolver.openInputStream(f.uri) } }))
         } catch (_: Exception) {
             null
         }
