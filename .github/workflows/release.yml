@@ -66,8 +66,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Noterne er det, appen viser, når den tilbyder opdateringen: første linje af hver commit siden forrige
+          # udgivelse, uden flette-commits.
+          FORRIGE="$(gh release view --json tagName --jq .tagName 2>/dev/null || true)"
+          if [ -n "$FORRIGE" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/compare/$FORRIGE...$GITHUB_SHA" \
+              --jq '.commits[] | select(.parents | length == 1) | "- " + (.commit.message | split("\n")[0])' > linjer.txt || true
+          fi
+          if [ -s linjer.txt ]; then
+            { echo "Ændringer:"; echo; cat linjer.txt; } > noter.md
+          elif [ -n "$FORRIGE" ]; then
+            echo "Ingen ændringer siden forrige udgivelse." > noter.md
+          else
+            echo "Første udgivelse." > noter.md
+          fi
+          cat noter.md
           gh release create "v$VERSION" dist/MINK.apk dist/MINK.apk.sha256 \
-            --title "MINK $VERSION" --generate-notes --latest
+            --title "MINK $VERSION" --notes-file noter.md --latest
 
       - name: Ryd op
         if: always()

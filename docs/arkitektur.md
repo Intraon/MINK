@@ -88,12 +88,12 @@ Frekvenser og lignende står ikke i koden. Værdierne ved første start ligger i
 
 ## Udgivelse og opdatering
 
-Workflowet **Udgiv** (`.github/workflows/release.yml`) startes i hånden. Det bygger med projektets nøgle fra repoets hemmeligheder og opretter en udgivelse med mærket `v<version>` og filen `MINK.apk`.
+Workflowet **Udgiv** (`.github/workflows/release.yml`) startes i hånden. Det bygger med projektets nøgle fra repoets hemmeligheder og opretter en udgivelse med mærket `v<version>` og filen `MINK.apk`. Udgivelsens noter er første linje af hver commit siden forrige udgivelse; det er dem, appen viser, når den tilbyder opdateringen.
 
 Appen finder nye versioner ud fra de to ting:
 
 1. `update/Releases` læser `https://api.github.com/repos/<mink.repo>/releases/latest`, tager versionen fra mærket og finder filen, der hedder `MINK.apk`. Versioner sammenlignes led for led som tal.
-2. `update/Updater` spørger højst hvert 12. time og aldrig under en måling. Er der en nyere version, hentes filen til appens cache-mappe og afleveres til Androids `PackageInstaller`. Systemets svar kommer tilbage til `MainActivity.onNewIntent`. Kan filen ikke hentes eller installeres, åbnes udgivelsen i browseren.
+2. `update/Updater` spørger højst hvert 12. time og aldrig under en måling. Er der en nyere version, vises noterne som ren tekst (`Releases.readable`), og filen hentes til appens cache-mappe og afleveres til Androids `PackageInstaller`. Systemets svar kommer tilbage til `MainActivity.onNewIntent`. Kan filen ikke hentes eller installeres, åbnes udgivelsen i browseren.
 
 Workflowet **Byg og test** (`.github/workflows/ci.yml`) kører det samme byggescript for hver pull request.
 
