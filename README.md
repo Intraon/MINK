@@ -15,14 +15,14 @@ Baggrunden står i artiklen [MINK finder forstyrrelser på en mesh-kanal](https:
 > The user interface, code comments and documentation are in Danish. MIT licensed.
 
 <p align="center">
-  <a href="https://intraon.dk/video/mink/vandfald.mp4"><img src="https://intraon.dk/media/mink/vandfald.webp" width="230" alt="Video: vandfaldet under en tur, med et smalt signal hvert fjerde sekund i kanalen"></a>
+  <a href="https://intraon.dk/video/mink/vandfald.mp4"><img src="docs/billeder/tur-vandfald.webp" width="230" alt="Video: vandfaldet under en tur, med et smalt signal hvert fjerde sekund i kanalen"></a>
   &nbsp;&nbsp;
-  <a href="https://intraon.dk/video/mink/kort.mp4"><img src="https://intraon.dk/media/mink/kort.webp" width="230" alt="Video: kortet under en tur, hvor ruten farves efter signalets styrke"></a>
+  <a href="https://intraon.dk/video/mink/kort.mp4"><img src="docs/billeder/tur-kort.webp" width="230" alt="Video: kortet under en tur, hvor ruten farves efter signalets styrke"></a>
   &nbsp;&nbsp;
-  <a href="https://intraon.dk/video/mink/kamera.mp4"><img src="https://intraon.dk/media/mink/kamera.webp" width="230" alt="Video: kameraskærmen, mens telefonen drejes rundt, og hver retning farves efter styrken"></a>
+  <a href="https://intraon.dk/video/mink/kamera.mp4"><img src="docs/billeder/tur-kamera.webp" width="230" alt="Video: kameraskærmen, mens telefonen drejes rundt, og hver retning farves efter styrken"></a>
 </p>
 
-<p align="center"><sub>▶ Tryk på et billede for at se videoen: vandfaldet, kortet og kameraet, optaget på en tur med appen. Videoerne ligger på <a href="https://intraon.dk/nyheder/mink">intraon.dk</a>.</sub></p>
+<p align="center"><sub>Optaget på en tur med appen: vandfaldet, kortet og kameraet. Tryk på et billede for at se videoen i fuld størrelse på <a href="https://intraon.dk/nyheder/mink">intraon.dk</a>.</sub></p>
 
 <p align="center">
   <img src="docs/billeder/maalebillede.png" width="760" alt="Målebillede: spektrum over 30 sekunder med et smalt signal hvert fjerde sekund">
