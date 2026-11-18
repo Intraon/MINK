@@ -1,6 +1,9 @@
 package dk.intraon.mink.ui
 
+import android.graphics.drawable.GradientDrawable
+import android.text.Editable
 import android.text.InputType
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -23,12 +26,19 @@ import dk.intraon.mink.radio.RtlTcpClient
 import dk.intraon.mink.trip.JsonlLog
 import dk.intraon.mink.update.Releases
 import dk.intraon.mink.waterfall.FigureExport
+import java.util.Locale
 import kotlin.math.abs
 
-/** Indstillinger som fuldskærms-view oven på hovedskærmen. Ændringer gælder fra næste Start. */
+/**
+ * Indstillinger som fuldskærms-view oven på hovedskærmen, ordnet efter hvor ofte de bruges: kanal og bånd, målet,
+ * modtageren, udstyr, det der gemmes, og til sidst finjusteringen, som er foldet sammen. Et mærke ved overskriften
+ * eller feltet siger, om en ændring gælder med det samme eller fra næste Start. Gem ligger fast i bunden.
+ */
 class SettingsScreen(private val a: MainActivity, private val s: Settings, private val onClose: () -> Unit) {
 
     private val col = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; setPadding(a.dp(16), a.dp(12), a.dp(16), a.dp(24)) }
+    /** Dér, det næste felt lægges: selve siden, en spalte i en række med to felter, eller den foldede finjustering. */
+    private var box: LinearLayout = col
 
     /** Hvem der står bag, hvilken version det er, og hvor opdateringer og kildekode kommer fra. */
     private fun about() {
@@ -41,42 +51,75 @@ class SettingsScreen(private val a: MainActivity, private val s: Settings, priva
         }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         col.addView(row, MATCH_PARENT, WRAP_CONTENT)
         note("Åben kildekode under MIT-licensen. Kortet er © OpenStreetMap-bidragyderne. Tuner: ${Hub.tuner}.\nLog: ${JsonlLog.DIR}/${JsonlLog.PREFIX}<tid>.jsonl.txt (+ .iq.wav) · billeder: ${FigureExport.DIR}")
-        // gælder med det samme; kontakten står under Gem-knappen
+        // gælder med det samme, uden Gem
         toggle("Se selv efter nye versioner", a.settings.autoUpdate).setOnCheckedChangeListener { _, on -> a.settings.autoUpdate = on }
         note("Når du åbner appen, spørger den GitHub, om der er udgivet en nyere version. Det sker højst to gange i døgnet og aldrig mens der måles. Får den ikke svar, prøver den igen tidligst en time senere. Der sendes ikke andet end forespørgslen.")
         action("Søg efter opdatering nu", Ui.BUTTON) { a.updater.check(quiet = false) }
+        action("Batteri-indstillinger for appen", Ui.BUTTON) { a.openAppSettings() }
         if (BuildConfig.REPO.isNotEmpty()) action("Kildekode på GitHub", Ui.BUTTON) { a.updater.openInBrowser(Releases.pageUrl(BuildConfig.REPO)) }
         action("intraon.dk", Ui.BUTTON) { a.updater.openInBrowser("https://intraon.dk") }
     }
 
-    private fun heading(text: String) = col.addView(TextView(a).apply {
-        this.text = text; textSize = 18f; setTextColor(Ui.ACCENT); setPadding(0, a.dp(18), 0, a.dp(4))
-    })
+    private val START = "fra næste Start"
+    private val NOW = "med det samme"
 
-    private fun note(text: String) = col.addView(TextView(a).apply {
+    /** Et lille mærke, der siger, hvornår en ændring gælder: [NOW] er grønt, [START] gråt. */
+    private fun mark(applies: String) = TextView(a).apply {
+        text = applies; textSize = 11f; setPadding(a.dp(8), a.dp(1), a.dp(8), a.dp(1))
+        setTextColor(if (applies == NOW) 0xFF9BE7C4.toInt() else 0xFFC4C9CF.toInt())
+        background = GradientDrawable().apply { cornerRadius = a.dp(10).toFloat(); setStroke(a.dp(1), if (applies == NOW) Ui.GREEN else 0xFF5F6368.toInt()) }
+    }
+
+    /** En tekst til venstre og, hvis [applies] er sat, mærket for hvornår ændringen gælder til højre. */
+    private fun labelled(label: TextView, applies: String?) {
+        if (applies == null) { box.addView(label); return }
+        val row = LinearLayout(a).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        row.addView(label, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        row.addView(mark(applies))
+        box.addView(row, MATCH_PARENT, WRAP_CONTENT)
+    }
+
+    private fun heading(text: String, applies: String? = null) =
+        labelled(TextView(a).apply { this.text = text; textSize = 18f; setTextColor(Ui.ACCENT); setPadding(0, a.dp(18), 0, a.dp(4)) }, applies)
+
+    private fun note(text: String) = TextView(a).apply {
         this.text = text; textSize = 13f; setTextColor(Ui.DIM); setPadding(0, a.dp(2), 0, a.dp(6))
-    })
+    }.also { box.addView(it) }
 
-    private fun edit(label: String, value: String, type: Int): EditText {
-        col.addView(TextView(a).apply { text = label; textSize = 14f; setTextColor(Ui.TEXT); setPadding(0, a.dp(8), 0, 0) })
+    private fun edit(label: String, value: String, type: Int, applies: String? = null): EditText {
+        labelled(TextView(a).apply { text = label; textSize = 14f; setTextColor(Ui.TEXT); setPadding(0, a.dp(8), 0, 0) }, applies)
         val e = EditText(a).apply {
             setText(value); inputType = type; textSize = 18f; setTextColor(Ui.TEXT); setSingleLine(true)
         }
-        col.addView(e, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        box.addView(e, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         return e
+    }
+
+    /** To felter ved siden af hinanden: [left] og [right] lægger hver sit felt i sin spalte. */
+    private fun <A, B> pair(left: () -> A, right: () -> B): Pair<A, B> {
+        val row = LinearLayout(a).apply { orientation = LinearLayout.HORIZONTAL }
+        val l = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL }
+        val r = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL }
+        row.addView(l, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginEnd = a.dp(8) })
+        row.addView(r, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginStart = a.dp(8) })
+        val outer = box
+        outer.addView(row, MATCH_PARENT, WRAP_CONTENT)
+        box = l; val first = left()
+        box = r; val second = right()
+        box = outer
+        return first to second
     }
 
     private fun toggle(label: String, on: Boolean): Switch {
         val sw = Switch(a).apply { text = label; isChecked = on; textSize = 16f; setTextColor(Ui.TEXT); setPadding(0, a.dp(12), 0, a.dp(12)) }
-        col.addView(sw, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        box.addView(sw, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         return sw
     }
 
-    private fun action(label: String, color: Int, onClick: () -> Unit) {
-        col.addView(
-            a.button(label, color) { onClick() }.apply { textSize = 16f },
-            LinearLayout.LayoutParams(MATCH_PARENT, a.dp(56)).apply { setMargins(0, a.dp(8), 0, 0) },
-        )
+    private fun action(label: String, color: Int, onClick: () -> Unit): View {
+        val b = a.button(label, color) { onClick() }.apply { textSize = 16f }
+        box.addView(b, LinearLayout.LayoutParams(MATCH_PARENT, a.dp(56)).apply { setMargins(0, a.dp(8), 0, 0) })
+        return b
     }
 
     fun build(): View {
@@ -85,50 +128,44 @@ class SettingsScreen(private val a: MainActivity, private val s: Settings, priva
         val txt = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
 
         col.addView(TextView(a).apply { text = "Indstillinger"; textSize = 24f; setTextColor(Ui.TEXT) })
-        note("Ændringer gælder fra næste Start. Gain og \"Skru ned ved mætning\" gælder med det samme.")
 
-        heading("Din kanal")
-        val ch = edit("Kanalens frekvens (MHz, 0 = ingen)", s.channelMhz.toString(), dec)
-        val chBw = edit("Kanalens bredde (kHz)", s.channelKhz.toString(), dec)
-        note("Din egen LoRa-kanal, fx MeshCore EU/UK narrow: 869,618 MHz og 62,5 kHz. Den vises som et grønt felt i vandfaldet, så du kan se, hvilke signaler der ligger inde i kanalen. Flytter du kanalen uden for båndet nedenfor, lægges båndet omkring den.")
+        heading("Kanal og bånd", START)
+        val (ch, chBw) = pair({ edit("Kanal (MHz)", s.channelMhz.toString(), dec) }, { edit("Bredde (kHz)", s.channelKhz.toString(), dec) })
+        note("Din egen LoRa-kanal, fx MeshCore EU/UK narrow: 869,618 MHz og 62,5 kHz. Den vises som et grønt felt i vandfaldet. Skriv 0, hvis du ikke har en. Flytter du kanalen uden for båndet, lægges båndet omkring den.")
+        val (lo, hi) = pair({ edit("Bånd fra (MHz)", s.bandLoMhz.toString(), dec) }, { edit("Bånd til (MHz)", s.bandHiMhz.toString(), dec) })
+        val bandView = BandView(a)
+        col.addView(bandView, LinearLayout.LayoutParams(MATCH_PARENT, a.dp(60)).apply { topMargin = a.dp(10) })
+        val bandNote = note("")
+        val widest = action("Brug 880 kHz omkring din kanal", Ui.BUTTON) {}
 
-        heading("Det der ledes efter")
-        val lo = edit("Bånd fra (MHz)", s.bandLoMhz.toString(), dec)
-        val hi = edit("Bånd til (MHz)", s.bandHiMhz.toString(), dec)
+        heading("Målet", START)
+        val tgt = edit("Målets frekvens (MHz)", s.targetMhz?.toString() ?: "", dec)
+        note("Den sender, som tal, pil, bip og kort følger. Den vælges nemmest ved at trykke på signalet i vandfaldet. Et tomt felt betyder, at der ikke er valgt et mål. Andre sendere gemmes stadig i loggen, og målet skifter aldrig af sig selv.")
         val bw = edit("Signalets bredde (kHz)", s.signalKhz.toString(), dec)
-        note("Bredden følger selv målet: når målet er målt nogle gange, stiller appen sig ind på dets bredde resten af turen. Tallet her er det, hver tur starter med.")
-        val tgt = edit("Mål-frekvens (MHz, tom = intet mål)", s.targetMhz?.toString() ?: "", dec)
-        note("Målet vælges nemmest ved at trykke på signalet i vandfaldet. Kun målet styrer tal, pil, bip og kort; andre sendere gemmes stadig i loggen. Målet skifter aldrig af sig selv.")
-        note("Appen finder smalle signaler hvor som helst i båndet (højst 880 kHz). Bredbåndet trafik som LoRa tæller ikke.")
-        val on = edit("Tærskel (dB over støjen)", s.onSnrDb.toString(), dec)
-        val minMs = edit("Korteste signal (ms)", s.minBurstMs.toString(), InputType.TYPE_CLASS_NUMBER)
-        val ign = edit("Ignorér frekvenser (MHz, fx 869.480-869.485; …)", s.ignore, txt)
+        note("Det, hver tur starter med. Når målet er målt nogle gange, stiller appen sig selv ind på dets bredde resten af turen.")
 
         heading("Modtager")
-        val ppm = edit("PPM-korrektion", s.ppm.toString(), int)
-        note("Donglens frekvensfejl. Du behøver sjældent røre den: når appen ser trafik på din kanal, tilbyder den selv at rette den. Én ppm flytter alt ca. 0,9 kHz ved 869 MHz. En ændring her gælder med det samme.")
-        val gain = edit("Gain (dB)", s.startGain.toString(), dec)
+        val gain = edit("Gain (dB)", s.startGain.toString(), dec, NOW)
+        note("Appen skruer aldrig højere op end dette, så tal og vandfald betyder det samme på hele turen. − og + på hovedskærmen flytter det samme valg.")
         val auto = toggle("Skru ned ved mætning", s.autoGain)
-        note("Appen skruer aldrig højere op end dette gain, så tal og vandfald betyder det samme overalt på turen. Helt tæt på senderen skruer den ned og tilbage igen; bippet følger signalet og ændrer sig ikke af det. − og + på hovedskærmen flytter valget med det samme.")
+        note("Helt tæt på senderen skruer appen ned og tilbage igen. Bippet følger signalet og ændrer sig ikke af det. Gælder med det samme.")
+        val ppm = edit("Frekvensrettelse (ppm)", s.ppm.toString(), int, NOW)
+        note("Modtagerens frekvensfejl. Du behøver sjældent røre den: når appen ser trafik på din kanal, tilbyder den selv at rette den. Én ppm flytter alt ca. 0,9 kHz ved 869 MHz.")
 
-        heading("Retningsantenne")
+        heading("Udstyr, lyd og skærm")
         val dir = toggle("Jeg har en retningsantenne", s.directional)
-        note("Så gemmer appen, hvilken vej telefonen peger, på hver måling, og fanen Kamera kommer frem. Hold telefonen i samme retning som antennen, som når du tager et billede. Det virker også med en almindelig antenne holdt ind mod brystet: kroppen skygger bagud.")
-
-        heading("Lyd og skærm")
+        note("Så kommer fanen Kamera frem, og appen gemmer, hvilken vej telefonen peger, på hver måling. Hold telefonen i samme retning som antennen. Det virker også med en almindelig antenne holdt ind mod brystet: kroppen skygger bagud.")
         val beep = toggle("Bip ved hver måling", s.beep)
         col.addView(TextView(a).apply { text = "Bip-lydstyrke"; textSize = 14f; setTextColor(Ui.TEXT) })
         val vol = SeekBar(a).apply { max = 100; progress = s.beepVolume }
         col.addView(vol, LinearLayout.LayoutParams(MATCH_PARENT, a.dp(48)))
         val keep = toggle("Hold skærmen tændt", s.keepScreenOn)
 
-        heading("Bølgeform")
-        val iq = toggle("Gem IQ-udsnit af hver måling", s.saveIq)
-        note("Et smalt udsnit af de rå samples omkring hvert signal gemmes i en WAV-fil ved siden af loggen, så signalet kan demoduleres bagefter. Ca. 30 KB pr. måling på 0,4 s. Lange udsendelser gemmes kun det første sekund.")
-
-        heading("Upload (valgfrit)")
-        note("Appen kan sende målingerne til din egen webhook undervejs, fx i Home Assistant. Tomt felt = intet sendes nogen steder; loggen ligger kun på telefonen.")
-        val hook = edit("Webhook-URL (tom = ingen upload)", s.webhook, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+        heading("Det, der gemmes og sendes", START)
+        val iq = toggle("Gem bølgeformen af hver måling", s.saveIq)
+        note("Et smalt udsnit af det modtagne omkring hvert signal gemmes i en WAV-fil ved siden af loggen, så signalet kan undersøges bagefter. Ca. 30 kB pr. måling på 0,4 s. Lange udsendelser gemmes kun det første sekund.")
+        val hook = edit("Webhook-adresse (tom = intet sendes)", s.webhook, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+        note("Appen kan sende målingerne til din egen server undervejs, fx Home Assistant. Uden en adresse ligger loggen kun på telefonen.")
         action("Test webhook", Ui.BUTTON) {
             val url = hook.text.toString().trim()
             if (url.isBlank()) a.toast("Der er ingen webhook at teste") else Thread {
@@ -137,10 +174,58 @@ class SettingsScreen(private val a: MainActivity, private val s: Settings, priva
             }.start()
         }
 
-        heading("Måling i baggrunden")
-        action("Batteri-indstillinger for appen", Ui.BUTTON) { a.openAppSettings() }
+        // Finjustering: felter, der sjældent røres, ligger foldet sammen bag én række
+        heading("Finjustering", START)
+        val fine = LinearLayout(a).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        val fold = a.button("Vis tærskel, korteste signal og frekvenser, der ignoreres", Ui.PANEL) {}.apply { textSize = 15f }
+        fold.setOnClickListener {
+            val open = fine.visibility != View.VISIBLE
+            fine.visibility = if (open) View.VISIBLE else View.GONE
+            fold.text = if (open) "Skjul finjusteringen" else "Vis tærskel, korteste signal og frekvenser, der ignoreres"
+        }
+        col.addView(fold, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = a.dp(4) })
+        col.addView(fine, MATCH_PARENT, WRAP_CONTENT)
+        box = fine
+        val on = edit("Tærskel (dB over støjen)", s.onSnrDb.toString(), dec)
+        note("Så meget skal et signal ligge over støjen for at tælle. Lavere finder svagere signaler, men også mere støj.")
+        val minMs = edit("Korteste signal (ms)", s.minBurstMs.toString(), InputType.TYPE_CLASS_NUMBER)
+        note("Kortere udbrud end dette regnes som støj.")
+        val ign = edit("Frekvenser, der ignoreres (MHz)", s.ignore, txt)
+        note("Fx 869.480-869.485; flere adskilles med semikolon. Bredbåndet trafik som LoRa tæller i forvejen ikke.")
+        box = col
 
-        action("Gem", Ui.GREEN) {
+        about()
+
+        val save = a.button("Gem", Ui.GREEN) {}.apply { textSize = 16f }
+        // båndet tjekkes, mens der skrives: tegningen og teksten under felterne følger med, og Gem er grå, til det passer
+        fun showBand() {
+            val l = Settings.parse(lo.text.toString()); val h = Settings.parse(hi.text.toString())
+            val c = Settings.parse(ch.text.toString()) ?: 0.0; val cw = Settings.parse(chBw.text.toString()) ?: 0.0
+            val problem = SettingsCheck.band(l, h)
+            val picture = BandPicture.of(l, h, c, cw)
+            bandView.visibility = if (picture == null) View.GONE else View.VISIBLE
+            bandView.show(picture, l?.let { String.format(Ui.DA, "%.3f", it) } ?: "", h?.let { String.format(Ui.DA, "%.3f", it) } ?: "", "modtageren ser ${SettingsCheck.khz(SettingsCheck.MAX_BAND_KHZ)} kHz")
+            bandNote.text = problem ?: "Båndet er ${SettingsCheck.khz(SettingsCheck.widthKhz(l!!, h!!))} kHz bredt. Appen finder smalle signaler hvor som helst i det."
+            bandNote.setTextColor(if (problem == null) Ui.DIM else 0xFFFF8A8E.toInt())
+            widest.visibility = if (picture?.tooWide == true) View.VISIBLE else View.GONE
+            (widest as TextView).text = if (c > 0) "Brug 880 kHz omkring din kanal" else "Brug 880 kHz midt i båndet"
+            save.isEnabled = problem == null; save.alpha = if (problem == null) 1f else 0.4f
+        }
+        widest.setOnClickListener {
+            val l = Settings.parse(lo.text.toString()); val h = Settings.parse(hi.text.toString())
+            val c = Settings.parse(ch.text.toString()) ?: 0.0
+            val (from, to) = SettingsCheck.widestAround(if (c > 0) c else if (l != null && h != null) (l + h) / 2 else return@setOnClickListener)
+            lo.setText(String.format(Locale.US, "%.3f", from)); hi.setText(String.format(Locale.US, "%.3f", to))
+        }
+        val watch = object : TextWatcher {
+            override fun afterTextChanged(e: Editable?) = showBand()
+            override fun beforeTextChanged(t: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(t: CharSequence?, start: Int, before: Int, count: Int) {}
+        }
+        for (e in listOf(lo, hi, ch, chBw)) e.addTextChangedListener(watch)
+        showBand()
+
+        save.setOnClickListener {
             val l = Settings.parse(lo.text.toString())
             val h = Settings.parse(hi.text.toString())
             val w = Settings.parse(bw.text.toString())
@@ -153,9 +238,7 @@ class SettingsScreen(private val a: MainActivity, private val s: Settings, priva
             val l2 = if (moved) Math.round((c - 0.185) * 1000) / 1000.0 else l
             val h2 = if (moved) Math.round((c + 0.185) * 1000) / 1000.0 else h
             when {
-                l == null || h == null || h <= l -> a.toast("Båndets øvre grænse skal være højere end den nedre")
-                h - l > 0.88 -> a.toast("Båndet må højst være 880 kHz bredt")
-                l < 24 || h > 1766 -> a.toast("Dongle'n dækker ca. 24–1766 MHz")
+                l == null || h == null || SettingsCheck.band(l, h) != null -> a.toast(SettingsCheck.band(l, h) ?: "")
                 c != 0.0 && (c < 24 || c > 1766) -> a.toast("Kanalens frekvens skal ligge mellem 24 og 1766 MHz (eller være 0)")
                 c != 0.0 && (cw < 1 || cw > 500) -> a.toast("Kanalens bredde skal være mellem 1 og 500 kHz")
                 w == null || w < 1.5 || w > 100 -> a.toast("Signalets bredde skal være mellem 1,5 og 100 kHz")
@@ -188,13 +271,15 @@ class SettingsScreen(private val a: MainActivity, private val s: Settings, priva
                 }
             }
         }
-        action("Annullér", Ui.BUTTON) { onClose() }
 
-        about()
-
-        return ScrollView(a).apply {
-            setBackgroundColor(Ui.BG); isClickable = true; isFillViewport = true
-            addView(col, MATCH_PARENT, WRAP_CONTENT)
+        // Gem og Annullér ligger fast under siden, så de kan nås uden at rulle
+        val bar = LinearLayout(a).apply { orientation = LinearLayout.HORIZONTAL; setBackgroundColor(Ui.PANEL); setPadding(a.dp(16), a.dp(10), a.dp(16), a.dp(12)) }
+        bar.addView(a.button("Annullér", Ui.BUTTON) { onClose() }.apply { textSize = 16f }, LinearLayout.LayoutParams(0, a.dp(56), 1f).apply { marginEnd = a.dp(4) })
+        bar.addView(save, LinearLayout.LayoutParams(0, a.dp(56), 1f).apply { marginStart = a.dp(4) })
+        return LinearLayout(a).apply {
+            orientation = LinearLayout.VERTICAL; setBackgroundColor(Ui.BG); isClickable = true
+            addView(ScrollView(a).apply { isFillViewport = true; addView(col, MATCH_PARENT, WRAP_CONTENT) }, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
+            addView(bar, MATCH_PARENT, WRAP_CONTENT)
         }
     }
 }
