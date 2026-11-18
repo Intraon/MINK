@@ -87,7 +87,7 @@ object TripShare {
         Thread {
             val made = MapPageExport.make(a, trips, pics)
             a.runOnUiThread {
-                if (made == null) a.toast("Kortfilen kunne ikke skrives")
+                if (made == null) a.toast("Kortfilen kunne ikke laves. Resten deles uden den.")
                 else if (!made.background) a.toast("Kortdata kunne ikke hentes, så kortfilen er uden baggrundskort.")
                 then(listOfNotNull(made?.file))
             }

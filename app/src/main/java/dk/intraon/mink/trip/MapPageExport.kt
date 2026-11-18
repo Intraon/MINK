@@ -24,8 +24,14 @@ object MapPageExport {
     private const val PHOTO_PX = 1280       // fotoernes længste side i filen
     private const val PHOTO_QUALITY = 80
 
-    /** Kald fra en baggrundstråd: der hentes kortdata, og filer læses og skrives. Null, hvis filen ikke kunne skrives. */
-    fun make(ctx: Context, trips: List<JsonlLog.Entry>, pictures: List<JsonlLog.Entry>): Made? {
+    /**
+     * Kald fra en baggrundstråd: der hentes kortdata, og filer læses og skrives. Null, hvis filen ikke kunne laves.
+     * En log med noget uventet i må ikke vælte appen midt i en deling, så enhver fejl undervejs ender som null.
+     */
+    fun make(ctx: Context, trips: List<JsonlLog.Entry>, pictures: List<JsonlLog.Entry>): Made? =
+        try { build(ctx, trips, pictures) } catch (_: Exception) { null }
+
+    private fun build(ctx: Context, trips: List<JsonlLog.Entry>, pictures: List<JsonlLog.Entry>): Made? {
         val logs = trips.map { e ->
             MapPage.Log(e.name, try { ctx.contentResolver.openInputStream(e.uri)?.bufferedReader()?.use { it.readLines() } ?: emptyList() } catch (_: Exception) { emptyList() })
         }
