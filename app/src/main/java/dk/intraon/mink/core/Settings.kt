@@ -90,6 +90,10 @@ class Settings(ctx: Context) {
     var shareZip: Boolean
         get() = p.getBoolean("shareZip", true)
         set(v) = p.edit().putBoolean("shareZip", v).apply()
+    /** Om der sidst blev lagt en kortfil ved, da en tur blev delt. Fra som udgangspunkt: kortdata hentes fra nettet. */
+    var shareMapPage: Boolean
+        get() = p.getBoolean("shareMapPage", false)
+        set(v) = p.edit().putBoolean("shareMapPage", v).apply()
     /** Se selv efter nye versioner på GitHub. */
     var autoUpdate: Boolean
         get() = p.getBoolean("autoUpdate", true)
