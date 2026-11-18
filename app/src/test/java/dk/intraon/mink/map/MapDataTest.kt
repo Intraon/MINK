@@ -18,4 +18,11 @@ class MapDataTest {
         assertEquals("et mærke uden position kan ikke stå på kortet", listOf(1, 2, 3, 4), marks.map { it.n })
         assertEquals(listOf(MarkKind.PLAIN, MarkKind.POSSIBLE, MarkKind.FOUND, MarkKind.PLAIN), marks.map { it.kind })
     }
+
+    @Test fun maaletsFrekvensErDenMidtersteOgIkkeDenFoersteMaaling() {
+        fun burst(sec: Int, mhz: String) =
+            """{"type":"burst","t":"2026-11-17T12:03:${"%02d".format(sec)}.000+01:00","lat":55.0001,"lon":9.0001,"f":"$mhz","src":1,"tgt":true,"snr":20.0,"lvl":-60.0,"gain":29.7,"dur":380}"""
+        val log = listOf(burst(0, "869.6625"), burst(4, "869.6399"), burst(8, "869.6401"), burst(12, "869.6397"), burst(16, "869.6400"))
+        assertEquals("den første måling lå 23 kHz ved siden af", 869_640_000.0, MapData.parse(listOf(log)).targetHz()!!, 500.0)
+    }
 }

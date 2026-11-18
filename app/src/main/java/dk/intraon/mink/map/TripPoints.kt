@@ -15,6 +15,12 @@ class TripPoints(
         return if (levels.isEmpty()) null else levels.min() to levels.max()
     }
 
+    /**
+     * Målets frekvens i Hz: den midterste af målingernes frekvenser. En enkelt måling kan ligge skævt, når støj
+     * trækker i toppen, så den midterste siger mere om senderen end den første. Null uden målinger med frekvens.
+     */
+    fun targetHz(): Double? = bursts.mapNotNull { it.freqHz }.sorted().let { if (it.isEmpty()) null else it[it.size / 2] }
+
     /** Alle steder med position som (bredde, længde): det, et kortudsnit skal rumme for at vise hele turen. */
     fun positions(): List<Pair<Double, Double>> {
         val res = ArrayList<Pair<Double, Double>>()

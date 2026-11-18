@@ -116,7 +116,7 @@ object TripShare {
             Thread {
                 val points = MapData.read(a, listOf(trip.uri))
                 a.runOnUiThread {
-                    val target = points.bursts.firstNotNullOfOrNull { it.freqHz }?.let { " · mål ${Ui.mhz(it)} MHz" } ?: ""
+                    val target = points.targetHz()?.let { " · mål ${Ui.mhz(it)} MHz" } ?: ""
                     val caption = "MINK · tur ${TripFiles.title(trip.name)}$target · ${points.bursts.size} målinger"
                     MapExport.tripPicture(a, points, caption) { bmp ->
                         if (bmp == null) { next(i + 1); return@tripPicture }
