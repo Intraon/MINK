@@ -16,9 +16,10 @@ import kotlin.math.max
 
 /**
  * Vandfald som i en SDR-modtager: spektret øverst, og under det tiden nedad med de nyeste øverst.
- * Svagt = mørkeblåt, stærkt = hvidt, gult og rødt. Tryk på et signal for at gøre det til målet.
+ * Svagt = mørkeblåt, stærkt = hvidt, gult og rødt. Tryk på et signal for at gøre det til målet ([onTap]). Et træk
+ * til siden beder om at se nabofrekvenserne: [onPan] får, hvor mange Hz båndet skal flyttes (positiv = opad).
  */
-class WaterfallView(ctx: Context, private val onTap: (Double) -> Unit) : View(ctx) {
+class WaterfallView(ctx: Context, private val onTap: (Double) -> Unit, private val onPan: (Double) -> Unit) : View(ctx) {
     private val d = resources.displayMetrics.density
     private var bmp: Bitmap? = null
     private var bmpW = 0
@@ -32,6 +33,9 @@ class WaterfallView(ctx: Context, private val onTap: (Double) -> Unit) : View(ct
     private val path = Path()
     private var downX = 0f
     private var downY = 0f
+    /** Så langt er billedet trukket til siden lige nu, i pixels. 0 = der trækkes ikke. */
+    private var dragPx = 0f
+    private var dragging = false
     private val palette = IntArray(256) { Scope.color(it / 255f) }
     private val ticker = object : Runnable {
         override fun run() { invalidate(); postDelayed(this, 40) }
@@ -70,6 +74,8 @@ class WaterfallView(ctx: Context, private val onTap: (Double) -> Unit) : View(ct
 
         val specH = 64 * d; val axisH = 18 * d
         val top = specH + axisH; val wfH = vh - top
+        // under et træk følger hele billedet fingeren; det nye bånd kommer, når fingeren løftes
+        c.save(); c.translate(dragPx, 0f)
 
         // vandfald: rækkerne head..ROWS-1 er de nyeste, 0..head-1 de ældste
         val n1 = Scope.ROWS - head
@@ -83,7 +89,7 @@ class WaterfallView(ctx: Context, private val onTap: (Double) -> Unit) : View(ct
 
         // spektrum: den nyeste række som kurve
         c.drawRect(0f, 0f, vw, specH, p.apply { color = 0xFF0A0C12.toInt() })
-        if (seq > 0) {
+        if (seq > 0 && (((seq - 1) % Scope.ROWS) * w).toInt() + w <= data.size) {
             val off = (((seq - 1) % Scope.ROWS) * w).toInt()
             path.reset()
             for (i in 0 until w) {
@@ -134,12 +140,22 @@ class WaterfallView(ctx: Context, private val onTap: (Double) -> Unit) : View(ct
             c.drawRect(x - d / 2, specH - 10 * d, x + d / 2, specH, p)
         }
         val tgt = Hub.targetHz
+        c.restore()
         if (tgt != null) {
-            val x = (Scope.columnOf(tgt) / w * vw).toFloat()
+            val x = (Scope.columnOf(tgt) / w * vw).toFloat() + dragPx
             p.color = 0x30FF3B30
             c.drawRect(x - 7 * d, 0f, x + 7 * d, vh, p)
             p.color = 0xFFFF3B30.toInt()
             c.drawRect(x - d / 2, 0f, x + d / 2, vh, p)
+            // ligger målet uden for det, der ses, peger et mærke i kanten hen mod det
+            if (x < 0 || x > vw) {
+                val label = if (x < 0) "◀ mål ${Ui.mhz(tgt)}" else "mål ${Ui.mhz(tgt)} ▶"
+                p.textSize = 12 * d
+                val tw = p.measureText(label) + 16 * d
+                val left = if (x < 0) 0f else vw - tw
+                p.color = 0xE6202124.toInt(); c.drawRect(left, top + 66 * d, left + tw, top + 92 * d, p)
+                p.color = 0xFFFFB4B6.toInt(); c.drawText(label, left + 8 * d, top + 84 * d, p)
+            }
         } else {
             p.color = Ui.TEXT; p.textSize = 13 * d
             val t = "Tryk på et signal for at vælge det som mål"
@@ -159,11 +175,27 @@ class WaterfallView(ctx: Context, private val onTap: (Double) -> Unit) : View(ct
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.action) {
-            MotionEvent.ACTION_DOWN -> { downX = e.x; downY = e.y }
-            MotionEvent.ACTION_UP -> if (Scope.width > 0 && abs(e.x - downX) < 16 * d && abs(e.y - downY) < 16 * d) {
-                performClick()
-                onTap(Scope.hzOf(e.x / width * Scope.width.toDouble()))
+            MotionEvent.ACTION_DOWN -> { downX = e.x; downY = e.y; dragging = false; dragPx = 0f }
+            MotionEvent.ACTION_MOVE -> {
+                val dx = e.x - downX
+                // et træk begynder, når fingeren er gået tydeligt mere til siden end op eller ned
+                if (!dragging && Scope.width > 0 && abs(dx) > 24 * d && abs(dx) > 2 * abs(e.y - downY)) {
+                    dragging = true; parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                if (dragging) { dragPx = dx; invalidate() }
             }
+            MotionEvent.ACTION_UP -> {
+                if (dragging) {
+                    // billedet er trukket til højre, når fingeren er gået til højre: så ses lavere frekvenser
+                    val byHz = -dragPx / width * Scope.width * Scope.binHz
+                    dragging = false; dragPx = 0f; invalidate()
+                    onPan(byHz)
+                } else if (Scope.width > 0 && abs(e.x - downX) < 16 * d && abs(e.y - downY) < 16 * d) {
+                    performClick()
+                    onTap(Scope.hzOf(e.x / width * Scope.width.toDouble()))
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> { dragging = false; dragPx = 0f; invalidate() }
         }
         return true
     }

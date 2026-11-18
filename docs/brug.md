@@ -33,6 +33,8 @@ Vandfaldet viser spektret af hele det lyttede bånd: frekvensen vandret, tiden n
 
 Tryk på et signal for at gøre det til **målet**. En rød linje markerer det, og fra da af er det kun målet, der styrer tallet, pilen, bippet, grafen og kortet. De andre sendere holdes adskilt efter frekvens og skrives stadig i loggen. Et tryk lidt ved siden af et signal rammer signalet; et tryk på et tomt sted flytter ikke et mål, der høres.
 
+**Træk til siden** i vandfaldet for at kigge på nabofrekvenserne. Båndet flytter med, og et blåt felt siger, hvad du ser. Ligger målet stadig i det, du ser, måles der videre. Ligger det udenfor, peger et mærke i kanten hen mod det, tallet og pilen holder pause, og der skrives ikke stille punkter imens. Sendere, du ser dér, gemmes i loggen som de andre. **Tilbage** fører hjem til turens bånd. Vælger du et mål under kigget, bliver båndet dér resten af turen, og det gemmes som båndet til næste tur.
+
 Målet skifter aldrig af sig selv, heller ikke når noget andet bliver stærkere. Intet mål er valgt på forhånd, og dit seneste valg huskes til næste tur.
 
 Signalbredden følger målet: er målet bredere eller smallere end den bredde, appen står på, stiller den sig ind efter nogle målinger. Det gælder resten af turen.

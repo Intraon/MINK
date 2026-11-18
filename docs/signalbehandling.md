@@ -8,7 +8,7 @@ Detektoren kender hverken kanal, varighed eller gentagelsestid. Den finder small
 
 | Trin | Hvad |
 |---|---|
-| Tuner | Lægges 75 kHz over båndet (`tuneFor`), så DC-spidsen midt i spektret ikke rammer det, der lyttes efter. Er båndet for bredt til det, lægges den i midten |
+| Tuner | Lægges 75 kHz over båndet (`tuneFor`), så DC-spidsen midt i spektret ikke rammer det, der lyttes efter. Er båndet for bredt til det, lægges den i midten. Trækker brugeren vandfaldet til siden, flyttes båndet i trin a 5 kHz (`BandShift`), tuneren følger med, og detektoren bygges om til det nye bånd. De første 300 ms efter flytningen giver ingen målinger, mens tuneren falder til ro |
 | FFT | 2048 punkter (500 Hz pr. bin), én pr. blok (2 ms), rektangulært vindue. De seneste 4 blokke midles (8 ms) |
 | Støjgulv | Medianen af alle brugbare bins (±450 kHz, uden ±3 kHz om DC), omregnet til middel (÷ ln 2). Genberegnes hver 8. blok |
 | Søgning | Et vindue på signalbredden glider over båndet. Der er en kandidat, hvor vinduet ligger mindst tærsklen over gulvet. Vinduets midte må ligge op til 10 kHz uden for båndet (`EDGE_AIR_HZ`) |

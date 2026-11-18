@@ -42,6 +42,18 @@ object Hub {
     @Volatile var autoGain = true
     /** Målet ligger så tæt på kanten af det, detektoren søger i, at det er ved at falde ud. */
     @Volatile var targetAtEdge = false
+    /**
+     * Det bånd, der lyttes på nu, og turens eget bånd (Hz). De er ens, indtil brugeren trækker vandfaldet til siden
+     * for at kigge på nabofrekvenserne. 0 = der måles ikke.
+     */
+    @Volatile var bandLoHz = 0.0
+    @Volatile var bandHiHz = 0.0
+    @Volatile var homeLoHz = 0.0
+    @Volatile var homeHiHz = 0.0
+    /** Der kigges ved siden af turens bånd. */
+    val away: Boolean get() = bandLoHz != homeLoHz || bandHiHz != homeHiHz
+    /** Målet ligger i det bånd, der lyttes på. False, mens der kigges et sted, hvor målet ikke kan høres. */
+    @Volatile var targetHeard = true
     /** Den signalbredde, detektoren er sat til (Hz). */
     @Volatile var signalBwHz = 0.0
     @Volatile var floorDb: Double? = null
@@ -123,6 +135,7 @@ object Hub {
         sessionStart = System.currentTimeMillis()
         sources = emptyList()
         targetAtEdge = false
+        bandLoHz = 0.0; bandHiHz = 0.0; homeLoHz = 0.0; homeHiHz = 0.0; targetHeard = true
         ppmSeq = 0
     }
 

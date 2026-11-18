@@ -205,7 +205,7 @@ class SettingsScreen(private val a: MainActivity, private val s: Settings, priva
             val picture = BandPicture.of(l, h, c, cw)
             bandView.visibility = if (picture == null) View.GONE else View.VISIBLE
             bandView.show(picture, l?.let { String.format(Ui.DA, "%.3f", it) } ?: "", h?.let { String.format(Ui.DA, "%.3f", it) } ?: "", "modtageren ser ${SettingsCheck.khz(SettingsCheck.MAX_BAND_KHZ)} kHz")
-            bandNote.text = problem ?: "Båndet er ${SettingsCheck.khz(SettingsCheck.widthKhz(l!!, h!!))} kHz bredt. Appen finder smalle signaler hvor som helst i det."
+            bandNote.text = problem ?: "Båndet er ${SettingsCheck.khz(SettingsCheck.widthKhz(l!!, h!!))} kHz bredt. Appen finder smalle signaler hvor som helst i det. Du kan kigge ved siden af båndet ved at trække til siden i vandfaldet."
             bandNote.setTextColor(if (problem == null) Ui.DIM else 0xFFFF8A8E.toInt())
             widest.visibility = if (picture?.tooWide == true) View.VISIBLE else View.GONE
             (widest as TextView).text = if (c > 0) "Brug 880 kHz omkring din kanal" else "Brug 880 kHz midt i båndet"

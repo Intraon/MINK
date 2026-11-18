@@ -110,9 +110,10 @@ class RtlTcpClient(
                 }
 
                 cmd(0x02, rate)
-                tunedHz = freqHz
+                // er tuneren flyttet undervejs, er det dér, en ny forbindelse efter et udfald skal stå
+                tunedHz = lastFreq ?: freqHz
                 cmd(0x05, lastPpm ?: ppm)
-                cmd(0x01, freqHz.toInt())
+                cmd(0x01, tunedHz.toInt())
                 gainDb = lastGain ?: gainDb
                 setGain(gainDb)
                 onState(State.RECEIVING, "Modtager")
@@ -147,6 +148,13 @@ class RtlTcpClient(
     @Volatile private var lastGain: Double? = null
     @Volatile private var lastPpm: Int? = null
     @Volatile private var tunedHz = 0L
+    @Volatile private var lastFreq: Long? = null
+
+    /** Flytter tuneren til [hz] nu. En ny forbindelse efter et udfald starter også dér. Må kaldes fra enhver tråd. */
+    fun changeFreq(hz: Long) {
+        lastFreq = hz; tunedHz = hz
+        try { writer.execute { cmd(0x01, hz.toInt()) } } catch (_: java.util.concurrent.RejectedExecutionException) {}
+    }
 
     /** Skifter gain nu. Må kaldes fra enhver tråd, også hovedtråden. */
     /** Ny PPM-korrektion med det samme. Frekvensen sendes igen, så tuneren flytter sig, uanset hvilken driver der svarer. */
