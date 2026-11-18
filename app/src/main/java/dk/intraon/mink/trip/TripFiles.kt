@@ -54,6 +54,10 @@ object TripFiles {
      */
     fun tripMapName(session: String): String = "MINK_kort_$session.png"
 
+    /** Kortfilens navn: turens tid for én tur, ellers antallet af ture og den nyestes tid. */
+    fun mapPageName(sessions: List<String>): String =
+        if (sessions.size == 1) "MINK_kort_${sessions[0]}.html" else "MINK_kort_${sessions.size}_ture_${sessions.maxOrNull()}.html"
+
     /** "16.11.2026 kl. 22.37" ud af et filnavn med tidsstempel; navnet selv, hvis det ikke har et. */
     fun title(name: String): String {
         val m = Regex("""(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})""").find(name) ?: return name

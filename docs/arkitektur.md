@@ -37,14 +37,18 @@ Kildekoden ligger i `app/src/main/java/dk/intraon/mink/`, én mappe pr. komponen
 | `measure/` | Selve målingen og det, den sætter i gang | `Beeper.toneHz`, `Outbox` | `MeasureService`, `Uploader`, `Beeper` |
 | `core/` | Det, alle deler: tilstanden mellem måling og skærm, brugerens indstillinger og mærkernes typer | `MarkKind` | `Hub`, `Settings` |
 | `waterfall/` | Vandfaldets data og visning, og målebilledet | `Scope`, `Figure`, `Pen` | `WaterfallView`, `CanvasPen`, `FigureExport` |
-| `map/` | Kortlaget, turens spor, varmekortet og tidligere ture på kortet | `Track`, `HeatGrid`, `TripPoints` | `PointsOverlay`, `MapData`, `MapExport` |
+| `map/` | Kortlaget, turens spor, varmekortet og tidligere ture på kortet, og baggrundskortet til kortfilen | `Track`, `HeatGrid`, `TripPoints`, `VectorTile`, `BaseMap`, `TileSource` | `PointsOverlay`, `MapData`, `MapExport` |
 | `replay/` | En tidligere tur som vandfald, genskabt fra log og bølgeform | `Replay`, `ClipSpectrum` | `IqClips`, `ReplayView`, `ReplayPane` |
 | `direction/` | Retningsantenne: retninger, roset, kompas og kameraskærm | `Bearing`, `Rose`, `CompassCheck`, `HeadingFilter`, `FlatLayout`, `CameraWatch` | `Compass`, `CameraPane` |
-| `trip/` | Turens filer: log, bølgeform, hvilke filer der hører til en tur, og deling | `TripFiles`, `ZipPack` | `JsonlLog`, `IqWav`, `Export`, `TripShare` |
+| `trip/` | Turens filer: log, bølgeform, hvilke filer der hører til en tur, kortfilen og deling | `TripFiles`, `ZipPack`, `MapPage` | `JsonlLog`, `IqWav`, `Export`, `TripShare`, `MapPageExport` |
 | `update/` | Opdatering fra GitHub-udgivelser | `Releases` | `Updater` |
 | `ui/` | Hovedskærmen, indstillingerne, vejledningen, grafen og fælles farver | – | `MainActivity`, `SettingsScreen`, `Guide`, `LevelGraphView`, `Ui` |
 
 Afhængighederne går nedad i dataflowet: `dsp/` kender ingen andre, `radio/` kender `dsp/` og vandfaldets data, og `ui/` kender alle. Skærmkomponenterne uden for `ui/` (`CameraPane`, `Updater`, `TripShare`) får `MainActivity` med ind for at kunne vise dialoger og læse indstillinger.
+
+## Kortfilen
+
+`MapPage` laver turenes data til kortfilen ud fra logfilernes linjer: målets målinger, stille perioder, mærker og pejlinger, med ture lige efter hinanden slået sammen. Pejlingens retning regnes som midten af den brede top i målingerne fra drejningen på stedet (`MapPage.lobe`). `BaseMap` vælger de vektorfliser, turene går igennem, og gør dem til baggrundskortets linjer og flader; `VectorTile` læser fliserne, og `TileSource` henter dem fra kilden i `gradle.properties` (`mink.mapTiles`). `MapPageExport` sætter det hele ind i skabelonen `app/src/main/assets/kort.html` sammen med pejlingernes fotos og gemmer filen. Skabelonen tegner selv kortet på et lærred og bruger intet bibliotek, så filen ikke henter noget, når den åbnes.
 
 ## Tråde
 

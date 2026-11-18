@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>MINK – kort over målinger</title>
+<style>
+html,body{height:100%;margin:0;overflow:hidden;font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1c1c1c;background:#f4f1ea}
+#kort{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+#zoom{position:absolute;left:10px;top:10px;z-index:5;display:flex;flex-direction:column;border:1px solid #999;border-radius:6px;overflow:hidden;background:#fff}
+#zoom button{width:38px;height:38px;border:0;background:#fff;font:600 20px/1 system-ui,sans-serif;cursor:pointer}
+#zoom button+button{border-top:1px solid #bbb}
+#panel{position:absolute;top:10px;right:10px;z-index:6;width:320px;max-width:calc(100vw - 68px);max-height:calc(100vh - 46px);display:flex;flex-direction:column;background:#fff;border:1px solid #bbb;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+#panel header{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #ddd}
+#panel header b{flex:1;font-size:15px}
+#panel button{font:inherit;border:1px solid #999;background:#f4f4f4;border-radius:6px;padding:3px 9px;cursor:pointer}
+#valg{overflow:auto;padding:8px 10px 10px}
+#panel.lukket #valg{display:none}
+#panel.lukket{width:auto}
+#panel.lukket header{border-bottom:0}
+h3{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#555;margin:12px 0 4px}
+h3:first-child{margin-top:0}
+label{display:flex;gap:7px;align-items:flex-start;padding:2px 0;cursor:pointer}
+label small,.lille{color:#555;font-size:12px}
+input[type=range]{width:100%}
+#skala{height:12px;border-radius:3px;border:1px solid #888;margin-top:4px}
+.skalatal{display:flex;justify-content:space-between;font-size:12px;color:#444}
+#top a{display:flex;justify-content:space-between;gap:8px;padding:3px 0;color:#0b4f8a;text-decoration:none;border-bottom:1px dotted #ccc}
+#top a span:last-child{color:#444;white-space:nowrap}
+#pop{position:absolute;z-index:4;display:none;max-width:min(300px,calc(100vw - 30px));background:#fff;border:1px solid #999;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.25);padding:9px 30px 9px 11px;font-size:13px;transform:translate(-50%,calc(-100% - 12px))}
+#pop img{display:block;width:100%;margin-top:7px;border-radius:5px;cursor:zoom-in}
+#pop .luk{position:absolute;top:3px;right:5px;border:0;background:none;font:20px/1 system-ui,sans-serif;cursor:pointer;color:#555}
+#stor{position:fixed;inset:0;z-index:9;display:none;background:rgba(0,0,0,.88);align-items:center;justify-content:center;cursor:zoom-out}
+#stor img{max-width:100%;max-height:100%}
+#kilde{position:absolute;right:0;bottom:0;z-index:3;background:rgba(255,255,255,.85);font-size:11px;padding:1px 6px;color:#333}
+</style>
+</head>
+<body>
+<canvas id="kort"></canvas>
+<div id="zoom"><button type="button" id="ind" aria-label="Zoom ind">+</button><button type="button" id="ud" aria-label="Zoom ud">−</button></div>
+<div id="panel">
+  <header><b>MINK – målinger</b><button id="fold" type="button">Skjul</button></header>
+  <div id="valg">
+    <h3>Vis kun målinger over <span id="minval"></span></h3>
+    <input type="range" id="min" step="1">
+    <div id="skala"></div>
+    <div class="skalatal"><span id="s-lav"></span><span id="s-midt"></span><span id="s-hoej"></span></div>
+    <h3>Ture</h3>
+    <div id="ture"></div>
+    <h3>Lag</h3>
+    <label><input type="checkbox" id="l-stille" checked><span>Stille stykker i gråt <small>(målet blev ikke hørt i 10 s)</small></span></label>
+    <label><input type="checkbox" id="l-pejl" checked><span>Pejlinger og mærker <small>(lang streg = tydelig retning, prikket = ingen)</small></span></label>
+    <h3>Stærkeste steder i det viste</h3>
+    <div id="top"></div>
+    <p class="lille" id="om" style="margin:10px 0 0"></p>
+  </div>
+</div>
+<div id="pop"></div>
+<div id="stor"><img alt=""></div>
+<div id="kilde"></div>
+<script>
+const DATA = /*DATA*/;
+const BASE = /*BASE*/;
+const FOTO = /*FOTO*/;
+// Farveskalaen følger filens egne målinger: fra den svageste til den kraftigste, dog mindst 20 dB.
+const NIVEAUER = DATA.flatMap(d=>d.target.map(r=>r[2]));
+const HØJ = NIVEAUER.length ? Math.ceil(Math.max(...NIVEAUER)) : -50, LAV = Math.min(NIVEAUER.length ? Math.floor(Math.min(...NIVEAUER)) : -90, HØJ-20);
+const STOPS = [[0,[44,62,158]],[0.26,[63,143,208]],[0.47,[55,179,164]],[0.63,[159,207,74]],[0.76,[246,211,45]],[0.87,[245,138,31]],[1,[215,38,30]]].map(s=>[LAV+s[0]*(HØJ-LAV),s[1]]);
+const GRÅ = 'rgb(150,150,150)', LILLA = '#7a1fa2', PAUSE_S = 30;
+function farve(v){
+  if(v==null) return GRÅ;
+  if(v<=STOPS[0][0]) return 'rgb('+STOPS[0][1]+')';
+  for(let i=1;i<STOPS.length;i++) if(v<=STOPS[i][0]){
+    const a=STOPS[i-1],b=STOPS[i],k=(v-a[0])/(b[0]-a[0]);
+    return 'rgb('+a[1].map((c,j)=>Math.round(c+(b[1][j]-c)*k))+')';
+  }
+  return 'rgb('+STOPS[STOPS.length-1][1]+')';
+}
+const $=id=>document.getElementById(id);
+$('skala').style.background='linear-gradient(90deg,'+STOPS.map(s=>'rgb('+s[1]+') '+((s[0]-LAV)/(HØJ-LAV)*100).toFixed(0)+'%').join(',')+')';
+const tal=(v,d=1)=>v.toFixed(d).replace('.',',').replace('-','−');
+const to=n=>String(n).padStart(2,'0');
+// Tiden vises, som uret gik, hvor turen blev kørt, uanset hvor filen åbnes.
+function tid(s,off,sek=true){ const d=new Date((s+off)*1000); return to(d.getUTCDate())+'.'+to(d.getUTCMonth()+1)+'. '+to(d.getUTCHours())+':'+to(d.getUTCMinutes())+(sek?':'+to(d.getUTCSeconds()):''); }
+
+// Kortet tegnes af filen selv. Et sted er et punkt på verdenskortet fra 0 til 1 i begge retninger (Mercator).
+const mx=lon=>(lon+180)/360, my=lat=>(1-Math.asinh(Math.tan(lat*Math.PI/180))/Math.PI)/2;
+const latAf=y=>Math.atan(Math.sinh(Math.PI*(1-2*y)))*180/Math.PI;
+function dekod(t){
+  const n=t.length/2, p=new Float64Array(n*2); let a=t[0], o=t[1], x0=1, y0=1, x1=0, y1=0;
+  for(let i=0;i<n;i++){
+    if(i){ a+=t[2*i]; o+=t[2*i+1]; }
+    const x=mx(o/1e5), y=my(a/1e5); p[2*i]=x; p[2*i+1]=y;
+    if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y;
+  }
+  return {p,b:[x0,y0,x1,y1]};
+}
+const grund = BASE && {
+  veje:[0,1,2,3,4].map(k=>BASE.veje.filter(v=>v[0]===k).map(v=>dekod(v[1]))),
+  navne:BASE.navne.map(v=>Object.assign(dekod(v[2]),{navn:v[0],k:v[1]})),
+  bane:BASE.bane.map(dekod), vand:BASE.vand.map(dekod), aaer:BASE.aaer.map(dekod),
+  flader:[0,1,2,3].map(k=>BASE.flader.filter(v=>v[0]===k).map(v=>dekod(v[1]))),
+  huse:BASE.huse.map(dekod),
+  steder:BASE.steder.map(s=>({x:mx(s[1]/1e5),y:my(s[0]/1e5),navn:s[2],rang:s[3]}))
+};
+$('kilde').textContent = grund ? 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap' : 'Uden baggrundskort: kortdata kunne ikke hentes, da filen blev lavet.';
+
+// Kortet tegnes i et gemt billede, der er større end skærmen. Når kortet flyttes, flyttes kun billedet, og der
+// tegnes først om, når kanten nås, eller når der er zoomet. Så følger kortet fingeren, også med mange målinger.
+const lærred=$('kort'), hoved=lærred.getContext('2d'), lag=document.createElement('canvas'), ctx=lag.getContext('2d');
+let TW=0, TH=0, gemt=null, senere=0;
+const vis={x:0.5,y:0.3,z:12};
+let W=0,H=0,dpr=1, ventende=false;
+const S=()=>256*Math.pow(2,vis.z);
+const sx=x=>(x-vis.x)*S()+TW/2, sy=y=>(y-vis.y)*S()+TH/2;          // i det gemte billede
+const px=x=>(x-vis.x)*S()+W/2, py=y=>(y-vis.y)*S()+H/2;            // på skærmen
+const punkt=(lat,lon)=>[sx(mx(lon)),sy(my(lat))], skærm=(lat,lon)=>[px(mx(lon)),py(my(lat))];
+function bed(){ if(!ventende){ ventende=true; requestAnimationFrame(()=>{ventende=false; tegn();}); } }
+function tilpas(){ dpr=window.devicePixelRatio||1; W=window.innerWidth; H=window.innerHeight; lærred.width=W*dpr; lærred.height=H*dpr; gemt=null; bed(); }
+window.addEventListener('resize',tilpas);
+function zoomVed(px,py,nyZ){
+  nyZ=Math.max(8,Math.min(20,nyZ)); const s0=S(), wx=vis.x+(px-W/2)/s0, wy=vis.y+(py-H/2)/s0;
+  vis.z=nyZ; const s1=S(); vis.x=wx-(px-W/2)/s1; vis.y=wy-(py-H/2)/s1; bed();
+}
+function visOmråde(pts,pad){
+  let x0=1,y0=1,x1=0,y1=0; for(const [lat,lon] of pts){ const x=mx(lon),y=my(lat); if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+  if(x1<x0) return;
+  vis.x=(x0+x1)/2; vis.y=(y0+y1)/2;
+  const bredde=Math.max(60,W-pad[0]-pad[2]), højde=Math.max(60,H-pad[1]-pad[3]);
+  vis.z=Math.max(8,Math.min(17,Math.log2(Math.min(bredde/Math.max(x1-x0,1e-7),højde/Math.max(y1-y0,1e-7))/256)));
+  vis.x+=(pad[2]-pad[0])/2/S(); vis.y+=(pad[3]-pad[1])/2/S(); bed();
+}
+
+const tilstand={min:LAV, ture:new Set(DATA.map(d=>d.id))};
+let stykker=[], punkter=[], mål=[], åben=null;
+
+function destination(lat,lon,grader,meter){
+  const R=6371000, b=grader*Math.PI/180, f1=lat*Math.PI/180, l1=lon*Math.PI/180, d=meter/R;
+  const f2=Math.asin(Math.sin(f1)*Math.cos(d)+Math.cos(f1)*Math.sin(d)*Math.cos(b));
+  return [f2*180/Math.PI,(l1+Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(f1),Math.cos(d)-Math.sin(f1)*Math.sin(f2)))*180/Math.PI];
+}
+function meter(a,b){ const k=111320; return Math.hypot((a.lat-b.lat)*k,(a.lon-b.lon)*k*Math.cos(a.lat*Math.PI/180)); }
+
+// Sporet: en streg farvet efter niveauet. Den svageste del tegnes først, så den kraftigste måling ligger øverst,
+// hvor ruten går samme vej flere gange. En pause på over et halvt minut bryder stregen.
+function opdatér(){
+  $('minval').textContent=tal(tilstand.min,0)+' dB';
+  const visStille=$('l-stille').checked; stykker=[]; punkter=[];
+  for(const d of DATA){
+    if(!tilstand.ture.has(d.id)) continue;
+    const række=d.target.filter(r=>r[2]>=tilstand.min).map(r=>({lat:r[0],lon:r[1],lvl:r[2],t:d.t0+r[3],snr:r[4],spd:r[5],tur:d}));
+    if(visStille) for(const q of d.quiet) række.push({lat:q[0],lon:q[1],lvl:null,t:d.t0+q[2],tur:d});
+    række.sort((a,b)=>a.t-b.t);
+    række.forEach((p,i)=>{
+      p.x=mx(p.lon); p.y=my(p.lat);
+      const før=i>0&&p.t-række[i-1].t<=PAUSE_S, efter=i<række.length-1&&række[i+1].t-p.t<=PAUSE_S;
+      if(før) stykker.push({a:række[i-1],b:p}); else if(!efter) stykker.push({a:p,b:p});
+      punkter.push(p);
+    });
+  }
+  const nøgle=s=>Math.max(s.a.lvl??-999,s.b.lvl??-999);
+  stykker.sort((x,y)=>nøgle(x)-nøgle(y));
+  const top=$('top'); top.innerHTML=''; const valgt=[];
+  for(const p of punkter.filter(p=>p.lvl!=null).sort((x,y)=>y.lvl-x.lvl)){
+    if(valgt.some(v=>meter(v,p)<250)) continue;
+    valgt.push(p); if(valgt.length===8) break;
+  }
+  for(const p of valgt){
+    const a=document.createElement('a'); a.href='#';
+    a.innerHTML='<span>'+tid(p.t,p.tur.off,false)+' · '+p.tur.kind+'</span><span>'+tal(p.lvl)+' dB</span>';
+    a.onclick=e=>{ e.preventDefault(); vis.x=p.x; vis.y=p.y; vis.z=16; visMåling(p); };
+    top.appendChild(a);
+  }
+  if(!valgt.length) top.innerHTML='<span class="lille">Ingen målinger med det valg.</span>';
+  gemt=null; bed();
+}
+
+function synlig(b){ const s=S(); return (b[2]-vis.x)*s+TW/2>=-20 && (b[0]-vis.x)*s+TW/2<=TW+20 && (b[3]-vis.y)*s+TH/2>=-20 && (b[1]-vis.y)*s+TH/2<=TH+20; }
+function sti(g){ const p=g.p; ctx.moveTo(sx(p[0]),sy(p[1])); for(let i=2;i<p.length;i+=2) ctx.lineTo(sx(p[i]),sy(p[i+1])); }
+// Fladerne er skåret i fliser. En tynd kant i fladens egen farve lukker sprækkerne mellem dem.
+function flader(liste,farven,kant){ ctx.beginPath(); for(const g of liste) if(synlig(g.b)) sti(g); ctx.fillStyle=farven; ctx.fill('evenodd'); ctx.strokeStyle=kant||farven; ctx.lineWidth=kant?0.6:1.2; ctx.stroke(); }
+function linjer(liste,farven,bredde,streg){ if(bredde<=0) return; ctx.beginPath(); for(const g of liste) if(synlig(g.b)) sti(g); ctx.strokeStyle=farven; ctx.lineWidth=bredde; ctx.setLineDash(streg||[]); ctx.stroke(); ctx.setLineDash([]); }
+function vejbredde(k,z){
+  if(k===0) return z<11?1.5:z<13?2.5:z<15?4:z<17?7:10;
+  if(k===1) return z<10?0:z<11?1:z<13?2:z<15?3:z<17?5.5:8;
+  if(k===2) return z<12?0:z<14?1:z<15?2:z<16?3.5:z<17?5.5:8;
+  if(k===3) return z<14?0:z<15?0.8:z<16?1.5:z<17?3:5;
+  return z<15?0:1.2;
+}
+function tekst(t,x,y,font,farven){ ctx.font=font; ctx.lineWidth=3.5; ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.strokeText(t,x,y); ctx.fillStyle=farven; ctx.fillText(t,x,y); }
+function tegnGrund(){
+  const z=vis.z;
+  flader(grund.flader[2],'#ebe7df'); flader(grund.flader[3],'#e7e2e8'); flader(grund.flader[1],'#e3eed8'); flader(grund.flader[0],'#cfe2c3'); flader(grund.vand,'#b8d5ea'); linjer(grund.aaer,'#b8d5ea',z<13?1:2);
+  if(z>=14.5) flader(grund.huse,'#ddd6cb','#c4bcaf');
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  linjer(grund.veje[4],'#b89b78',vejbredde(4,z),[4,4]);
+  for(const k of [3,2,1,0]) linjer(grund.veje[k],'#b4ada1',vejbredde(k,z)>0?vejbredde(k,z)+1.6:0);
+  for(const k of [3,2,1,0]) linjer(grund.veje[k],k===0?'#f5c98f':k===1?'#fbe7ad':'#fff',vejbredde(k,z));
+  linjer(grund.bane,'#8d8d8d',z<12?1:2); linjer(grund.bane,'#fff',z<12?0:1,[7,7]);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  if(z>=14.5){
+    const sat=[];
+    for(const g of grund.navne){
+      if(!synlig(g.b)||(g.k>=3&&z<16)) continue;
+      // navnet står langs vejens længste lige stykke, hvis der er plads til det
+      let bedst=0, bi=-1; const p=g.p;
+      for(let i=0;i+3<p.length;i+=2){ const l=Math.hypot(sx(p[i+2])-sx(p[i]),sy(p[i+3])-sy(p[i+1])); if(l>bedst){bedst=l;bi=i;} }
+      ctx.font='11px system-ui,sans-serif';
+      if(bi<0||bedst<ctx.measureText(g.navn).width+14) continue;
+      const x=(sx(p[bi])+sx(p[bi+2]))/2, y=(sy(p[bi+1])+sy(p[bi+3]))/2;
+      if(x<0||x>TW||y<0||y>TH||sat.some(s=>s.n===g.navn&&Math.hypot(s.x-x,s.y-y)<260)) continue;
+      sat.push({n:g.navn,x,y});
+      let v=Math.atan2(sy(p[bi+3])-sy(p[bi+1]),sx(p[bi+2])-sx(p[bi])); if(v>Math.PI/2) v-=Math.PI; if(v<-Math.PI/2) v+=Math.PI;
+      ctx.save(); ctx.translate(x,y); ctx.rotate(v); tekst(g.navn,0,0,'11px system-ui,sans-serif','#555'); ctx.restore();
+    }
+  }
+  for(const s of grund.steder){
+    if((s.rang===1&&z<11.5)||(s.rang===2&&z<13.5)) continue;
+    const x=sx(s.x), y=sy(s.y); if(x<-50||x>TW+50||y<-20||y>TH+20) continue;
+    tekst(s.navn,x,y,(s.rang===0?'600 15px':s.rang===1?'600 12.5px':'12px')+' system-ui,sans-serif','#333');
+  }
+}
+
+function mærkat(t,x,y,kant){
+  ctx.font='600 12px system-ui,sans-serif'; const w=ctx.measureText(t).width+12, h=20;
+  // to mærkater samme sted lægges under hinanden, så begge kan læses
+  while(mål.some(m=>x<m.x1&&x+w>m.x0&&y-h/2<m.y1&&y+h/2>m.y0)) y+=h+3;
+  ctx.beginPath(); ctx.roundRect?ctx.roundRect(x,y-h/2,w,h,4):ctx.rect(x,y-h/2,w,h);
+  ctx.fillStyle='#fff'; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=kant; ctx.stroke();
+  ctx.fillStyle='#111'; ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(t,x+6,y+0.5);
+  return {x0:x,y0:y-h/2,x1:x+w,y1:y+h/2};
+}
+function retning(b){ return b.center!=null?b.center:b.best!=null?b.best:b.hdg; }
+function gengiv(){
+  const kant=Math.round(Math.max(W,H)*0.35), tæthed=Math.min(dpr,2);
+  TW=W+2*kant; TH=H+2*kant; lag.width=TW*tæthed; lag.height=TH*tæthed;
+  ctx.setTransform(tæthed,0,0,tæthed,0,0); ctx.fillStyle='#f4f1ea'; ctx.fillRect(0,0,TW,TH);
+  if(grund) tegnGrund();
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  const z=vis.z, bredde=z<=12?3.5:z<=14?5:z<=16?7:9, syn=[];
+  for(const s of stykker){
+    const a=[sx(s.a.x),sy(s.a.y)], b=s.a===s.b?a:[sx(s.b.x),sy(s.b.y)];
+    if((a[0]<-20&&b[0]<-20)||(a[1]<-20&&b[1]<-20)||(a[0]>TW+20&&b[0]>TW+20)||(a[1]>TH+20&&b[1]>TH+20)) continue;
+    syn.push([s,a,b]);
+  }
+  const streg=(a,b)=>{ ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0]+(a[0]===b[0]&&a[1]===b[1]?0.01:0),b[1]); ctx.stroke(); };
+  ctx.strokeStyle='#15171c'; ctx.lineWidth=bredde+3; for(const [s,a,b] of syn) streg(a,b);
+  ctx.lineWidth=bredde;
+  for(const [s,a,b] of syn){
+    const fa=farve(s.a.lvl), fb=farve(s.b.lvl);
+    if(fa===fb||Math.hypot(a[0]-b[0],a[1]-b[1])<2) ctx.strokeStyle=(s.b.lvl??-999)>(s.a.lvl??-999)?fb:fa;
+    else { const g=ctx.createLinearGradient(a[0],a[1],b[0],b[1]); g.addColorStop(0,fa); g.addColorStop(1,fb); ctx.strokeStyle=g; }
+    streg(a,b);
+  }
+  mål=[];
+  if($('l-pejl').checked) for(const d of DATA){
+    if(!tilstand.ture.has(d.id)) continue;
+    for(const b of d.bearings){
+      const grader=retning(b); if(grader==null) continue;
+      const klar=b.swing!=null&&b.swing>=15&&!b.poor, svag=!klar&&b.swing!=null&&b.swing>=10;
+      const fra=punkt(b.lat,b.lon), til=punkt(...destination(b.lat,b.lon,grader,klar?2000:svag?1000:500));
+      ctx.strokeStyle=LILLA; ctx.globalAlpha=klar?0.95:0.75; ctx.lineWidth=klar?3:2; ctx.setLineDash(klar?[]:svag?[8,6]:[2,6]);
+      ctx.beginPath(); ctx.moveTo(fra[0],fra[1]); ctx.lineTo(til[0],til[1]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+      ctx.beginPath(); ctx.arc(fra[0],fra[1],6,0,7); ctx.fillStyle=LILLA; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle='#fff'; ctx.stroke();
+      // zoomet langt ud står mærkaterne oven i hinanden, så dér vises kun prikken
+      const r=z>=12.5?mærkat('P'+(b.n||'')+' · '+Math.round(grader)+'°'+(b.photo&&FOTO[b.photo]?' · foto':''),fra[0]+10,fra[1]-16,LILLA):{x0:0,y0:0,x1:-1,y1:-1};
+      mål.push(Object.assign(r,{cx:fra[0],cy:fra[1],åbn:()=>visPejling(b,d)}));
+    }
+    for(const m of d.marks){
+      const p=punkt(m.lat,m.lon), r=z>=12.5?mærkat('M'+(m.n||''),p[0]+6,p[1]-14,'#111'):{x0:0,y0:0,x1:-1,y1:-1};
+      ctx.beginPath(); ctx.arc(p[0],p[1],4,0,7); ctx.fillStyle='#111'; ctx.fill();
+      mål.push(Object.assign(r,{cx:p[0],cy:p[1],åbn:()=>pop(m.lat,m.lon,'<b>Mærke '+(m.n||'')+'</b>'+(m.kind==='possible'?' (mulig kilde)':m.kind==='found'?' (kilde fundet)':'')+'<br>'+tid(d.t0+m.t,d.off)+'<br>'+d.label)}));
+    }
+  }
+  gemt={x:vis.x,y:vis.y,z:vis.z};
+}
+function tegn(){
+  if(!gemt) gengiv();
+  const k=Math.pow(2,vis.z-gemt.z), s=S(), cx=(gemt.x-vis.x)*s+W/2, cy=(gemt.y-vis.y)*s+H/2, bw=TW*k, bh=TH*k;
+  if(k===1&&(cx-bw/2>0||cy-bh/2>0||cx+bw/2<W||cy+bh/2<H)){ gengiv(); tegn(); return; }
+  hoved.setTransform(dpr,0,0,dpr,0,0); hoved.fillStyle='#f4f1ea'; hoved.fillRect(0,0,W,H);
+  hoved.drawImage(lag,cx-bw/2,cy-bh/2,bw,bh);
+  // under zoom vises det gemte billede forstørret; det tegnes skarpt, når fingrene har ligget stille et øjeblik
+  if(k!==1){ clearTimeout(senere); senere=setTimeout(()=>{ gengiv(); bed(); },140); }
+  const mpp=40075016.686*Math.cos(latAf(vis.y)*Math.PI/180)/S(); let m=1; for(const n of [20,50,100,200,500,1000,2000,5000,10000,20000]) if(n/mpp<=130) m=n;
+  hoved.fillStyle='rgba(255,255,255,.85)'; hoved.fillRect(8,H-30,m/mpp+14,22); hoved.strokeStyle='#222'; hoved.lineWidth=2; hoved.beginPath(); hoved.moveTo(14,H-22); hoved.lineTo(14,H-14); hoved.lineTo(14+m/mpp,H-14); hoved.lineTo(14+m/mpp,H-22); hoved.stroke();
+  hoved.fillStyle='#222'; hoved.font='11px system-ui,sans-serif'; hoved.textAlign='left'; hoved.textBaseline='alphabetic'; hoved.fillText(m>=1000?(m/1000)+' km':m+' m',19,H-18);
+  if(åben){ const p=skærm(åben.lat,åben.lon); const e=$('pop'); e.style.left=p[0]+'px'; e.style.top=p[1]+'px'; }
+}
+
+function pop(lat,lon,html){ åben={lat,lon}; const e=$('pop'); e.innerHTML='<button class="luk" type="button" aria-label="Luk">×</button>'+html; e.style.display='block'; e.querySelector('.luk').onclick=lukPop; const b=e.querySelector('img'); if(b) b.onclick=()=>{ $('stor').firstChild.src=b.src; $('stor').style.display='flex'; }; bed(); }
+function lukPop(){ åben=null; $('pop').style.display='none'; }
+$('stor').onclick=()=>{ $('stor').style.display='none'; };
+function visMåling(p){
+  pop(p.lat,p.lon,(p.lvl==null?'<b>Stille</b><br>Målet blev ikke hørt i 10 sekunder.':'<b>'+tal(p.lvl)+' dB</b>'+(p.snr!=null?' · '+tal(p.snr)+' dB over støjen':''))+
+    '<br>'+tid(p.t,p.tur.off)+(p.spd!=null?' · '+p.spd+' km/t':'')+'<br>'+p.tur.label+'<br><span class="lille">'+p.lat.toFixed(5)+', '+p.lon.toFixed(5)+'</span>');
+}
+function visPejling(b,d){
+  const klar=b.swing!=null&&b.swing>=15&&!b.poor, svag=!klar&&b.swing!=null&&b.swing>=10;
+  let t='<b>Pejling '+(b.n||'')+'</b><br>';
+  if(b.center!=null) t+='Retning '+Math.round(b.center)+'° (midten af den brede top).<br>Niveauet svingede '+tal(b.swing)+' dB fra den kraftigste til den svageste retning. '+(klar?'Tydelig retning.':svag?'Svag retning.':'Ingen tydelig retning, stregen er ikke til at stole på.');
+  else t+='Retning '+Math.round(retning(b))+'°. Der er ikke drejet nok rundt på stedet til at vurdere, hvor sikker den er.';
+  if(b.poor) t+=' Kompasset var usikkert.';
+  if(b.best!=null&&b.center!=null&&Math.abs(((b.best-b.center+540)%360)-180)>=8) t+='<br>Appen viste '+Math.round(b.best)+'° som den ene stærkeste retning.';
+  if(b.lvl!=null) t+='<br>Niveau '+tal(b.lvl)+' dB, da pejlingen blev gemt.';
+  t+='<br>'+tid(d.t0+b.t,d.off)+' · '+d.label;
+  if(b.photo&&FOTO[b.photo]) t+='<img alt="Foto fra pejlingen" src="data:image/jpeg;base64,'+FOTO[b.photo]+'">';
+  else if(b.photo) t+='<br><span class="lille">Fotoet '+b.photo+' var ikke på telefonen, da filen blev lavet.</span>';
+  pop(b.lat,b.lon,t);
+}
+function tryk(x,y){
+  // mærkaternes pladser kendes i det gemte billede, så det skal passe med det, der ses
+  if(!gemt||gemt.z!==vis.z){ clearTimeout(senere); gengiv(); bed(); }
+  const bx=x-((gemt.x-vis.x)*S()+W/2-TW/2), by=y-((gemt.y-vis.y)*S()+H/2-TH/2);
+  for(const m of mål) if((bx>=m.x0&&bx<=m.x1&&by>=m.y0&&by<=m.y1)||Math.hypot(bx-m.cx,by-m.cy)<=14){ m.åbn(); return; }
+  let bedst=null, bd=20;
+  for(const p of punkter){
+    const d=Math.hypot(px(p.x)-x,py(p.y)-y); if(d>20) continue;
+    if(!bedst||d<bd-6||(Math.abs(d-bd)<=6&&(p.lvl??-999)>(bedst.lvl??-999))){ bedst=p; bd=Math.min(bd,d); }
+  }
+  if(bedst) visMåling(bedst); else lukPop();
+}
+
+// Træk flytter kortet, to fingre eller hjulet zoomer.
+const fingre=new Map(); let flyttet=false, knib=null;
+lærred.addEventListener('pointerdown',e=>{ lærred.setPointerCapture(e.pointerId); fingre.set(e.pointerId,[e.clientX,e.clientY]); flyttet=false;
+  if(fingre.size===2){ const [a,b]=[...fingre.values()]; knib={d:Math.hypot(a[0]-b[0],a[1]-b[1]),z:vis.z}; } });
+lærred.addEventListener('pointermove',e=>{
+  const f=fingre.get(e.pointerId); if(!f) return;
+  const dx=e.clientX-f[0], dy=e.clientY-f[1]; fingre.set(e.pointerId,[e.clientX,e.clientY]);
+  if(fingre.size===1){ if(Math.abs(dx)+Math.abs(dy)>0){ if(Math.hypot(dx,dy)>2) flyttet=true; vis.x-=dx/S(); vis.y-=dy/S(); bed(); } }
+  else if(fingre.size===2&&knib){ flyttet=true; const [a,b]=[...fingre.values()]; const d=Math.hypot(a[0]-b[0],a[1]-b[1]); vis.x-=dx/2/S(); vis.y-=dy/2/S(); zoomVed((a[0]+b[0])/2,(a[1]+b[1])/2,knib.z+Math.log2(d/knib.d)); }
+});
+const slip=e=>{ const var1=fingre.size===1&&fingre.has(e.pointerId); fingre.delete(e.pointerId); if(fingre.size<2) knib=null; if(var1&&!flyttet&&e.type==='pointerup') tryk(e.clientX,e.clientY); };
+lærred.addEventListener('pointerup',slip); lærred.addEventListener('pointercancel',slip);
+lærred.addEventListener('wheel',e=>{ e.preventDefault(); zoomVed(e.clientX,e.clientY,vis.z-e.deltaY*(e.deltaMode?0.05:0.0022)); },{passive:false});
+lærred.addEventListener('dblclick',e=>zoomVed(e.clientX,e.clientY,vis.z+1));
+$('ind').onclick=()=>zoomVed(W/2,H/2,vis.z+1); $('ud').onclick=()=>zoomVed(W/2,H/2,vis.z-1);
+
+const ture=$('ture');
+DATA.forEach(d=>{
+  const l=document.createElement('label');
+  l.innerHTML='<input type="checkbox" checked><span>'+d.label+'<br><small>'+(d.n?d.n+' målinger af målet, stærkest '+tal(d.max)+' dB':'målet blev ikke hørt')+'</small></span>';
+  l.querySelector('input').onchange=e=>{ e.target.checked?tilstand.ture.add(d.id):tilstand.ture.delete(d.id); opdatér(); };
+  ture.appendChild(l);
+});
+$('min').min=LAV; $('min').max=HØJ; $('min').value=LAV;
+$('s-lav').textContent=tal(LAV,0)+' dB svagt'; $('s-midt').textContent=tal((LAV+HØJ)/2,0); $('s-hoej').textContent='kraftigt '+tal(HØJ,0)+' dB';
+$('min').oninput=e=>{ tilstand.min=+e.target.value; opdatér(); };
+$('l-stille').onchange=opdatér; $('l-pejl').onchange=()=>{ gemt=null; bed(); };
+const panel=$('panel'), fold=$('fold');
+fold.onclick=()=>{ const lukket=panel.classList.toggle('lukket'); fold.textContent=lukket?'Vis valg':'Skjul'; };
+if(window.innerWidth<700) fold.onclick();
+$('om').textContent='Sporet er farvet efter målets niveau, og hvor ruten går samme vej flere gange, ligger den kraftigste måling øverst. Niveauet er dBFS minus gain, det samme tal som i appen. Ture til fods og i bil kan ikke sammenlignes direkte, bilen dæmper. Lavet {{LAVET}}.';
+
+tilpas();
+const alle=[]; DATA.forEach(d=>{ d.target.forEach(r=>alle.push([r[0],r[1]])); d.quiet.forEach(r=>alle.push([r[0],r[1]])); d.bearings.forEach(b=>alle.push([b.lat,b.lon])); });
+visOmråde(alle,[60,30,panel.classList.contains('lukket')?30:360,40]);
+opdatér();
+</script>
+</body>
+</html>

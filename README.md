@@ -36,6 +36,7 @@ Baggrunden står i artiklen [MINK finder forstyrrelser på en mesh-kanal](https:
 - **Styrke, pil og bip** for målet: tallet er dB over støjen, pilen viser, om du kommer tættere på, og tonen stiger med styrken.
 - **Log med position** for hver måling, og et punkt hvert 10. sekund for, om der var stille.
 - **Kort og varmekort**, også for tidligere ture. Kortet kan gemmes som billede.
+- **Kortfil til browseren**: en eller flere ture i én HTML-fil med sporet, pejlingerne og deres fotos. Filen henter intet, når den åbnes.
 - **Se en tur igen**: en liste over ture, og turens vandfald genskabt fra loggen med det ægte signal i hvert udbrud.
 - **Bølgeformen** (IQ) af hvert signal gemmes, så modulation og bitrate kan undersøges bagefter.
 - **Donglens frekvensfejl** rettes med ét tryk ud fra trafikken på din egen kanal.
@@ -78,7 +79,7 @@ Formaterne er beskrevet i [docs/logformat.md](docs/logformat.md).
 
 Appen spørger GitHub, om der er udgivet en nyere version, højst to gange i døgnet og aldrig mens der måles. Android spørger dig, før en opdatering installeres, og installerer kun en APK, der er signeret med samme nøgle som den installerede. Tjekket kan slås fra under ⚙ → Om MINK.
 
-Alt andet bliver på telefonen. Log, bølgeform og billeder sendes kun videre, når du trykker **Del**, eller hvis du selv har skrevet en webhook-adresse under ⚙. Kortfliserne hentes fra OpenStreetMap.
+Alt andet bliver på telefonen. Log, bølgeform og billeder sendes kun videre, når du trykker **Del**, eller hvis du selv har skrevet en webhook-adresse under ⚙. Kortfliserne hentes fra OpenStreetMap. Beder du om en kortfil, når du deler, hentes kortdata for de områder, turen går igennem, fra OpenFreeMap; ellers kontaktes OpenFreeMap aldrig.
 
 ## Byg selv
 
@@ -107,4 +108,5 @@ MINK er udgivet under MIT-licensen, se [LICENSE](LICENSE). © 2026 JOHANSEN CONS
 
 - Kortet tegnes med [osmdroid](https://github.com/osmdroid/osmdroid) (Apache-2.0).
 - Kortdata er © OpenStreetMap-bidragyderne (ODbL).
+- Kortfilens baggrund kommer fra [OpenFreeMap](https://openfreemap.org) © OpenMapTiles, med data fra OpenStreetMap.
 - Donglen åbnes af appen "Rtl-sdr driver", som installeres for sig og ikke er en del af MINK.

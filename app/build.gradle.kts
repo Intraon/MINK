@@ -33,6 +33,7 @@ android {
         buildConfigField("String", "DEF_CHANNEL", "\"${prop("mink.channelMhz")}\"")
         buildConfigField("String", "REPO", "\"${prop("mink.repo")}\"")
         buildConfigField("String", "DEF_CHANNEL_KHZ", "\"${prop("mink.channelKhz")}\"")
+        buildConfigField("String", "MAP_TILES", "\"${prop("mink.mapTiles")}\"")
     }
 
     signingConfigs {

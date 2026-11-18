@@ -104,6 +104,18 @@ På fanen **Kort** gemmer samme knap kortet, som du ser det: udsnittet, linjen e
 
 Vælger du **Det hele**, når du deler, laver appen desuden selv et kort over hele turen: udsnittet rummer alle steder, du har målt, og turen er tegnet som den farvede linje med mærker og pejlinger. Kortfliserne hentes fra nettet, så uden forbindelse kommer turen med på en tom baggrund. Der er ét sådant kort pr. tur; deler du turen igen, erstattes det.
 
+## Kortfilen
+
+Sætter du flueben ved **Læg et kort ved, der kan åbnes i en browser**, når du deler, laver appen én HTML-fil med de valgte ture. Den åbnes i en browser på en pc eller en telefon og kan sendes som enhver anden fil.
+
+- Sporet er en streg farvet efter målets niveau. Hvor ruten går samme vej flere gange, ligger den kraftigste måling øverst, og stille stykker er grå. Et tryk på stregen viser tid, niveau og sted.
+- Hver pejling har en mærkat med nummer og retning. Et tryk åbner pejlingen med dens foto. Retningen er midten af den brede top fra drejningen på stedet, og stregen er lang, når retningen er tydelig, og prikket, når den ikke er.
+- Ture lige efter hinanden vises som én, og hver tur kan slås til og fra. En skyder skjuler alt under et valgt niveau.
+
+Baggrundskortet hentes, når filen laves, for de områder, turene går igennem, og lægges i selve filen sammen med fotoerne. Filen henter derfor intet, når den åbnes, og virker uden net. Har telefonen ikke net, når filen laves, bliver den lavet uden baggrund.
+
+Filen hedder `MINK_kort_<tur>.html` og ligger i `Download/mink/`. Deler du de samme ture igen, erstattes den.
+
 ## Del
 
 Et tryk på **Del** åbner en dialog for den seneste tur. Du vælger, hvor meget der skal med: kun loggen, loggen og bølgeformen, eller det hele med et kort over turen og turens billeder. Dialogen viser, hvor meget hvert valg fylder. **Pak som én zip-fil** samler det valgte i én fil. Derefter åbner Androids delemenu. Appen siger, hvad den pakker, og hvis en fil ikke kan læses, nævner den filen og pakker resten. Appen skriver ingen tekst for dig, og valgene huskes til næste gang.
