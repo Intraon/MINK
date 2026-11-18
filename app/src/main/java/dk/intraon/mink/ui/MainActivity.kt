@@ -115,6 +115,8 @@ class MainActivity : Activity() {
     private var follow = true
     /** De tidligere ture, kortet viser. Tom = kun den aktuelle tur. */
     private var shown: List<JsonlLog.Entry> = emptyList()
+    /** Vejledningen er lige blevet vist for første gang. */
+    private var guideOpened = false
     /** Det udsnit, kortet skal vise, når det får en størrelse. Det har ingen, før fanen Kort har været vist. */
     private var waitingBox: BoundingBox? = null
     /** Nummeret på den seneste anmodning om at vise ture. En indlæsning, der hører til en ældre, bruges ikke. */
@@ -148,7 +150,8 @@ class MainActivity : Activity() {
         applyDirectional()
         Hub.listen(listener)
         applyKeepScreenOn()
-        if (!settings.guideSeen) { settings.guideSeen = true; showGuide() } else updater.autoCheck()
+        // første gang vises vejledningen, og et tilbud om en opdatering skal ikke lægge sig oven på den
+        if (!settings.guideSeen) { settings.guideSeen = true; guideOpened = true; showGuide() }
         updater.onInstallStatus(intent)
     }
 
@@ -165,6 +168,8 @@ class MainActivity : Activity() {
         map.onResume()
         ui.post(ticker)
         if (tab == 2) cameraPane.open()
+        // appen bliver ofte liggende i hukommelsen i dagevis, så der ses efter en ny version, hver gang den kommer frem
+        if (guideOpened) guideOpened = false else updater.autoCheck()
     }
 
     override fun onPause() {

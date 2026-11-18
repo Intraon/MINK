@@ -104,9 +104,13 @@ class Settings(ctx: Context) {
     var autoUpdate: Boolean
         get() = p.getBoolean("autoUpdate", true)
         set(v) = p.edit().putBoolean("autoUpdate", v).apply()
+    /** Sidste gang GitHub svarede på, om der er en ny version, og sidste gang et tjek blev uden svar. */
     var updateCheckedAt: Long
         get() = p.getLong("updateCheckedAt", 0)
         set(v) = p.edit().putLong("updateCheckedAt", v).apply()
+    var updateFailedAt: Long
+        get() = p.getLong("updateFailedAt", 0)
+        set(v) = p.edit().putLong("updateFailedAt", v).apply()
     /** En version, brugeren har bedt om ikke at få tilbudt igen. */
     var skippedVersion: String
         get() = p.getString("skippedVersion", "") ?: ""

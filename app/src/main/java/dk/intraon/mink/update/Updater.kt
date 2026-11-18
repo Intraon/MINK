@@ -29,17 +29,15 @@ import java.net.URL
 class Updater(private val a: MainActivity) {
     companion object {
         const val ACTION_INSTALL_STATUS = "dk.intraon.mink.INSTALL_STATUS"
-        /** Så ofte ser appen selv efter en ny version. */
-        private const val EVERY_MS = 12 * 3600_000L
     }
 
     private var busy = false
 
-    /** Ved start: se efter en ny version, hvis det er længe siden sidst, og der ikke måles. */
+    /** Når appen kommer frem på skærmen: se efter en ny version, hvis det er tid ([Releases.due]), og der ikke måles. */
     fun autoCheck() {
         val s = a.settings
         if (!s.autoUpdate || Hub.running || BuildConfig.REPO.isEmpty()) return
-        if (System.currentTimeMillis() - s.updateCheckedAt < EVERY_MS) return
+        if (!Releases.due(System.currentTimeMillis(), s.updateCheckedAt, s.updateFailedAt)) return
         check(quiet = true)
     }
 
@@ -52,7 +50,7 @@ class Updater(private val a: MainActivity) {
             val rel = try { fetch() } catch (_: Exception) { null }
             a.runOnUiThread {
                 busy = false
-                a.settings.updateCheckedAt = System.currentTimeMillis()
+                if (rel == null) a.settings.updateFailedAt = System.currentTimeMillis() else a.settings.updateCheckedAt = System.currentTimeMillis()
                 when {
                     rel == null -> if (!quiet) a.toast("Kunne ikke hente oplysninger om udgivelser")
                     !Releases.newer(rel.version, BuildConfig.VERSION_NAME) -> if (!quiet) a.toast("Du har den nyeste version (${BuildConfig.VERSION_NAME})")

@@ -77,7 +77,7 @@ Formaterne er beskrevet i [docs/logformat.md](docs/logformat.md).
 
 ## Opdatering og privatliv
 
-Appen spørger GitHub, om der er udgivet en nyere version, højst to gange i døgnet og aldrig mens der måles. Android spørger dig, før en opdatering installeres, og installerer kun en APK, der er signeret med samme nøgle som den installerede. Tjekket kan slås fra under ⚙ → Om MINK.
+Når appen åbnes, spørger den GitHub, om der er udgivet en nyere version. Det sker højst to gange i døgnet og aldrig mens der måles; får den ikke svar, prøver den igen tidligst en time senere. Android spørger dig, før en opdatering installeres, og installerer kun en APK, der er signeret med samme nøgle som den installerede. Tjekket kan slås fra under ⚙ → Om MINK.
 
 Alt andet bliver på telefonen. Log, bølgeform og billeder sendes kun videre, når du trykker **Del**, eller hvis du selv har skrevet en webhook-adresse under ⚙. Kortfliserne hentes fra OpenStreetMap. Beder du om en kortfil, når du deler, hentes kortdata for de områder, turen går igennem, fra OpenFreeMap; ellers kontaktes OpenFreeMap aldrig.
 
