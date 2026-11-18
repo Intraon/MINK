@@ -17,8 +17,9 @@ object Guide {
         KNAPPERNE
         ⚑ Mærke: sætter et mærke dér, hvor du står, som mulig kilde, fundet kilde eller almindeligt mærke.
         − og + Gain: donglens forstærkning. Appen skruer selv ned ved mætning, men aldrig op.
-        Del: sender turens log videre – og bølgeformen og billederne, hvis du krydser dem af. Det hele kan pakkes i én zip-fil. "Tidligere ture" ligger samme sted.
-        Billede: gemmer en figur af de seneste 30 sekunder i galleriet.
+        Del: sender den tur, du ser. Ser du den aktuelle tur, er det turene fra i dag, som du ikke har delt endnu. Du krydser af, hvad der skal med: log, bølgeform, billeder og kort. Det hele kan pakkes i én zip-fil.
+        ◀ Aktuel tur ▶ nederst i vandfaldet og på kortet: bladrer i tidligere ture. Tryk på navnet for at få listen over ture.
+        Billede: gemmer det, du ser, i galleriet. I vandfaldet er det en figur af de seneste 30 sekunder, på kortet er det kortet.
         ⚙ Indstil: din kanal, det bånd der lyttes i, og resten.
         ?: denne vejledning.
 

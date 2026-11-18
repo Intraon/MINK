@@ -4,6 +4,8 @@ import android.content.Context
 import dk.intraon.mink.BuildConfig
 import dk.intraon.mink.dsp.BurstDetector
 import dk.intraon.mink.radio.GainControl
+import dk.intraon.mink.trip.SharedTrips
+import dk.intraon.mink.trip.TripFiles
 
 /** Brugerens indstillinger. Standardværdierne kommer fra gradle.properties (mink.*), så intet er hardcodet her. */
 class Settings(ctx: Context) {
@@ -83,10 +85,10 @@ class Settings(ctx: Context) {
     var nomediaDone: Boolean
         get() = p.getBoolean("nomediaDone", false)
         set(v) = p.edit().putBoolean("nomediaDone", v).apply()
-    /** Hvor meget der sidst blev taget med, da en tur blev delt (se TripFiles.SHARE_…), og om det blev pakket i en zip. */
-    var shareLevel: Int
-        get() = p.getInt("shareLevel", 2)
-        set(v) = p.edit().putInt("shareLevel", v).apply()
+    /** Hvad der sidst blev taget med, da en tur blev delt (summen af TripFiles.PART_…), og om det blev pakket i en zip. */
+    var shareParts: Int
+        get() = p.getInt("shareParts", TripFiles.PART_ALL)
+        set(v) = p.edit().putInt("shareParts", v).apply()
     var shareZip: Boolean
         get() = p.getBoolean("shareZip", true)
         set(v) = p.edit().putBoolean("shareZip", v).apply()
@@ -94,6 +96,10 @@ class Settings(ctx: Context) {
     var shareMapPage: Boolean
         get() = p.getBoolean("shareMapPage", false)
         set(v) = p.edit().putBoolean("shareMapPage", v).apply()
+    /** De ture, der er delt fra denne telefon. Listen ligger kun her; logfilerne røres ikke. */
+    var sharedTrips: SharedTrips
+        get() = SharedTrips.decode(p.getString("sharedTrips", "") ?: "")
+        set(v) = p.edit().putString("sharedTrips", v.encode()).apply()
     /** Se selv efter nye versioner på GitHub. */
     var autoUpdate: Boolean
         get() = p.getBoolean("autoUpdate", true)

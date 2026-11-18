@@ -3,8 +3,7 @@ package dk.intraon.mink.trip
 import android.app.AlertDialog
 import android.widget.CheckBox
 import android.widget.LinearLayout
-import android.widget.RadioButton
-import android.widget.RadioGroup
+import android.widget.TextView
 import dk.intraon.mink.map.MapData
 import dk.intraon.mink.map.MapExport
 import dk.intraon.mink.ui.MainActivity
@@ -14,11 +13,13 @@ import dk.intraon.mink.ui.dp
 /** Dialogen bag Del-knappen. */
 object TripShare {
     /**
-     * Del en eller flere ture. Brugeren vælger ét trin: kun loggen, loggen med bølgeformen (IQ), eller det hele med
-     * et kort over turen og turens billeder. Der kan lægges en kortfil ved, som åbnes i en browser ([MapPage]), og
-     * filerne kan pakkes i én zip-fil. Valgene huskes.
+     * Del en eller flere ture. Brugeren krydser af, hvad der skal med: loggen, bølgeformen (IQ), turens billeder, et
+     * billede af kortet over hver tur og en kortfil, som åbnes i en browser ([MapPage]). Det hele kan pakkes i én
+     * zip-fil, og valgene huskes. Kun det, turene har, tilbydes. [today] siger, at [chosen] er dagens udelte ture,
+     * så dialogen kan fortælle det. Når brugeren har valgt en app i delemenuen, og loggene var med, huskes turene
+     * som delt.
      */
-    fun show(a: MainActivity, chosen: List<JsonlLog.Entry>, all: List<JsonlLog.Entry>, offerOlder: Boolean) {
+    fun show(a: MainActivity, chosen: List<JsonlLog.Entry>, all: List<JsonlLog.Entry>, today: Boolean = false) {
         val sessions = chosen.mapNotNull { TripFiles.stamp(it.name) }
         val allStamps = all.mapNotNull { TripFiles.stamp(it.name) }
         val iq = JsonlLog.list(a, JsonlLog.IQ_SUFFIX).filter { TripFiles.stamp(it.name) in sessions }
@@ -27,55 +28,62 @@ object TripShare {
         val pics = Export.pictures(a).filter { p ->
             p.name !in tripMaps && sessions.any { s -> TripFiles.inTrip(p.name, s, TripFiles.nextAfter(s, allStamps)) }
         }
-        fun filesAt(level: Int) = chosen +
-            (if (level >= TripFiles.SHARE_WAVE) iq else emptyList()) + (if (level >= TripFiles.SHARE_ALL) pics else emptyList())
-        fun label(level: Int): String {
-            val what = when (level) {
-                TripFiles.SHARE_LOG -> if (chosen.size == 1) "Kun loggen" else "Kun loggene"
-                TripFiles.SHARE_WAVE -> "Log og bølgeform"
-                else -> "Det hele: " + inWords(listOfNotNull(
-                    "log", "bølgeform".takeIf { iq.isNotEmpty() }, "kort",
-                    (if (pics.size == 1) "1 billede" else "${pics.size} billeder").takeIf { pics.isNotEmpty() },
-                ))
-            }
-            return "$what · ${TripFiles.size(filesAt(level).sumOf { it.bytes })}"
-        }
-
-        val levels = TripFiles.shareLevels(iq.isNotEmpty())
-        val group = RadioGroup(a)
-        for (level in levels) group.addView(RadioButton(a).apply { id = ID0 + level; text = label(level); textSize = 16f; minHeight = a.dp(44) })
-        group.check(ID0 + TripFiles.shareLevel(a.settings.shareLevel, levels))
-        val zipBox = CheckBox(a).apply { text = "Pak som én zip-fil"; textSize = 16f; minHeight = a.dp(44); isChecked = a.settings.shareZip }
-        val pageBox = CheckBox(a).apply {
-            text = "Læg et kort ved, der kan åbnes i en browser. Baggrundskortet hentes fra nettet for det område, turen går igennem."
-            textSize = 16f; minHeight = a.dp(44); isChecked = a.settings.shareMapPage
-        }
+        val one = chosen.size == 1
+        val parts = a.settings.shareParts
+        fun size(files: List<JsonlLog.Entry>) = TripFiles.size(files.sumOf { it.bytes })
+        fun box(label: String, on: Boolean) = CheckBox(a).apply { text = label; textSize = 16f; minHeight = a.dp(44); isChecked = on }
+        val logBox = box("${if (one) "Loggen" else "Loggene"} · ${size(chosen)}", parts and TripFiles.PART_LOG != 0)
+        val waveBox = if (iq.isEmpty()) null else box("Bølgeformen · ${size(iq)}", parts and TripFiles.PART_WAVE != 0)
+        val picsBox = if (pics.isEmpty()) null else box(
+            "${if (pics.size == 1) "1 billede" else "${pics.size} billeder"} fra ${if (one) "turen" else "turene"} · ${size(pics)}",
+            parts and TripFiles.PART_PICTURES != 0,
+        )
+        val mapBox = box(if (one) "Et billede af kortet over turen" else "Et billede af kortet over hver tur", parts and TripFiles.PART_MAP != 0)
+        val pageBox = box("Et kort, der kan åbnes i en browser. Baggrundskortet hentes fra nettet for det område, turen går igennem.", a.settings.shareMapPage)
+        val zipBox = box("Pak som én zip-fil", a.settings.shareZip)
         val box = LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(a.dp(20), a.dp(8), a.dp(20), 0)
-            addView(group); addView(pageBox); addView(zipBox)
+            if (!one) addView(TextView(a).apply {
+                val names = chosen.map { it.name }.sorted()
+                text = if (today) "Ture fra i dag, der ikke er delt: ${inWords(names.map { TripFiles.clock(it) })}."
+                else inWords(names.map { TripFiles.title(it) }) + "."
+                textSize = 14f; setTextColor(Ui.DIM); setPadding(a.dp(6), 0, a.dp(6), a.dp(8))
+            })
+            for (b in listOfNotNull(logBox, waveBox, picsBox, mapBox, pageBox, zipBox)) addView(b)
         }
-        val b = AlertDialog.Builder(a)
-            .setTitle(if (chosen.size == 1) "Del turen ${TripFiles.title(chosen[0].name)}" else "Del ${chosen.size} ture")
+        AlertDialog.Builder(a)
+            .setTitle(if (one) "Del turen ${TripFiles.title(chosen[0].name)}" else "Del ${chosen.size} ture" + if (today) " fra i dag" else "")
             .setView(box)
             .setPositiveButton("Del") { _, _ ->
-                val level = group.checkedRadioButtonId - ID0
                 val zip = zipBox.isChecked
-                a.settings.shareLevel = level; a.settings.shareZip = zip; a.settings.shareMapPage = pageBox.isChecked
-                val waves = if (level >= TripFiles.SHARE_WAVE) iq else emptyList()
+                // en del, turene ikke har, tilbydes ikke og beholder sit gemte valg
+                var kept = parts
+                for ((b, part) in listOf(logBox to TripFiles.PART_LOG, waveBox to TripFiles.PART_WAVE, picsBox to TripFiles.PART_PICTURES, mapBox to TripFiles.PART_MAP)) {
+                    if (b != null) kept = if (b.isChecked) kept or part else kept and part.inv()
+                }
+                a.settings.shareParts = kept; a.settings.shareZip = zip; a.settings.shareMapPage = pageBox.isChecked
+                val logs = if (logBox.isChecked) chosen else emptyList()
+                val waves = if (waveBox?.isChecked == true) iq else emptyList()
+                val photos = if (picsBox?.isChecked == true) pics else emptyList()
+                if (logs.isEmpty() && waves.isEmpty() && photos.isEmpty() && !mapBox.isChecked && !pageBox.isChecked) {
+                    a.toast("Der er ikke valgt noget at dele"); return@setPositiveButton
+                }
+                val picked = {
+                    if (logs.isNotEmpty()) a.settings.sharedTrips = a.settings.sharedTrips.after(
+                        chosen.mapNotNull { e -> TripFiles.stamp(e.name)?.let { it to e.bytes } }.toMap(), allStamps,
+                    )
+                }
                 makePage(a, chosen, pics, pageBox.isChecked) { page ->
-                    if (level < TripFiles.SHARE_ALL) { deliver(a, sessions, chosen, waves, emptyList(), emptyList(), page, zip); return@makePage }
-                    a.toast(if (chosen.size == 1) "Laver kort over turen …" else "Laver kort over turene …")
-                    makeMaps(a, chosen) { maps -> deliver(a, sessions, chosen, waves, maps, pics, page, zip) }
+                    if (!mapBox.isChecked) { deliver(a, sessions, logs, waves, emptyList(), photos, page, zip, picked); return@makePage }
+                    a.toast(if (one) "Laver kort over turen …" else "Laver kort over turene …")
+                    makeMaps(a, chosen) { maps -> deliver(a, sessions, logs, waves, maps, photos, page, zip, picked) }
                 }
             }
             .setNegativeButton("Annullér", null)
-        if (offerOlder) b.setNeutralButton("Tidligere ture …") { _, _ -> a.sessionsDialog() }
-        b.show()
+            .setNeutralButton("Flere ture …") { _, _ -> a.tripsDialog(chosen.map { it.name }) }
+            .show()
     }
-
-    /** Første id til dialogens valgknapper; trinnet lægges til. */
-    private const val ID0 = 0x4D494E00
 
     /**
      * Laver kortfilen, hvis brugeren har bedt om den, og kalder [then] på hovedtråden med den (eller en tom liste).
@@ -123,15 +131,19 @@ object TripShare {
         next(0)
     }
 
-    /** Sender filerne til Androids delemenu, enkeltvis eller pakket i én zip. */
+    /**
+     * Sender filerne til Androids delemenu, enkeltvis eller pakket i én zip. [picked] kaldes, når brugeren har valgt
+     * en app i menuen.
+     */
     private fun deliver(
         a: MainActivity, sessions: List<String>, logs: List<JsonlLog.Entry>, waves: List<JsonlLog.Entry>,
-        maps: List<JsonlLog.Entry>, pics: List<JsonlLog.Entry>, page: List<JsonlLog.Entry>, zip: Boolean,
+        maps: List<JsonlLog.Entry>, pics: List<JsonlLog.Entry>, page: List<JsonlLog.Entry>, zip: Boolean, picked: () -> Unit,
     ) {
         val files = logs + waves + maps + pics + page
-        if (!zip) { Export.share(a, files.map { it.uri }, if (files.size == 1) "text/plain" else "*/*"); return }
+        if (files.isEmpty()) { a.toast("Der blev ikke noget at dele"); return }
+        if (!zip) { Export.share(a, files.map { it.uri }, mime(files), picked = picked); return }
         a.toast("Pakker " + inWords(listOfNotNull(
-            if (logs.size == 1) "loggen" else "${logs.size} logge",
+            (if (logs.size == 1) "loggen" else "${logs.size} logge").takeIf { logs.isNotEmpty() },
             (if (waves.size == 1) "bølgeformen" else "${waves.size} bølgeformer").takeIf { waves.isNotEmpty() },
             (if (maps.size == 1) "kortet" else "${maps.size} kort").takeIf { maps.isNotEmpty() },
             "kortfilen".takeIf { page.isNotEmpty() },
@@ -143,9 +155,21 @@ object TripShare {
             a.runOnUiThread {
                 if (packed == null) { a.toast("Zip-filen kunne ikke skrives"); return@runOnUiThread }
                 if (packed.unread.isNotEmpty()) a.toast("Kunne ikke læse ${packed.unread.joinToString(", ")}. Resten er pakket.")
-                Export.share(a, listOf(packed.uri), "application/zip")
+                Export.share(a, listOf(packed.uri), "application/zip", picked = picked)
             }
         }.start()
+    }
+
+    /** Filtypen, delemenuen får at vide: den ene fils egen type, eller "blandet" for flere. */
+    private fun mime(files: List<JsonlLog.Entry>): String {
+        val name = files.singleOrNull()?.name ?: return "*/*"
+        return when {
+            name.endsWith(".png") -> "image/png"
+            name.endsWith(".jpg") -> "image/jpeg"
+            name.endsWith(".html") -> "text/html"
+            name.endsWith(".wav") -> "audio/x-wav"
+            else -> "text/plain"
+        }
     }
 
     /** "log, bølgeform og kort": en opremsning, som man siger den. */

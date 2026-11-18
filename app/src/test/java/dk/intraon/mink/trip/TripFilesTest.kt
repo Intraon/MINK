@@ -30,15 +30,6 @@ class TripFilesTest {
         assertNull(TripFiles.nextAfter("20261116_230110", all))
     }
 
-    @Test fun delingTilbyderKunDetTurenHarOgHuskerValget() {
-        assertEquals("det hele findes altid: kortet laves ved delingen", listOf(TripFiles.SHARE_LOG, TripFiles.SHARE_ALL), TripFiles.shareLevels(hasWave = false))
-        val all = TripFiles.shareLevels(hasWave = true)
-        assertEquals(listOf(TripFiles.SHARE_LOG, TripFiles.SHARE_WAVE, TripFiles.SHARE_ALL), all)
-        assertEquals("det hele er valgt, til brugeren vælger andet", TripFiles.SHARE_ALL, TripFiles.shareLevel(TripFiles.SHARE_ALL, all))
-        assertEquals("et valg med bølgeform falder til loggen, når turen ingen bølgeform har", TripFiles.SHARE_LOG,
-            TripFiles.shareLevel(TripFiles.SHARE_WAVE, TripFiles.shareLevels(hasWave = false)))
-    }
-
     @Test fun kortbilledetHoererTilDenTurKortetViser() {
         val old = "20261116_223740"; val newest = "20261117_120129"
         val ofOld = TripFiles.mapPictureName("20261117_130000", old)
