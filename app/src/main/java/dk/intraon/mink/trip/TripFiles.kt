@@ -21,6 +21,18 @@ object TripFiles {
     /** Starten på den første tur efter [session] blandt [all], eller null hvis [session] er den nyeste. */
     fun nextAfter(session: String, all: Collection<String>): String? = all.filter { it > session }.minOrNull()
 
+    /**
+     * Den tur, der bladres til fra [shown] blandt [names] (logfilernes navne, nyeste først): [dir] +1 er ældre og -1
+     * nyere. Der regnes fra turens navn og ikke fra dens plads, for pladserne flytter sig, når en ny tur begynder.
+     * Den tur, der kører ([live] er begyndelsen af dens navn), springes over; den vises i forvejen som den aktuelle.
+     * Svaret er pladsen i [names], -1 for den aktuelle tur, eller antallet af navne, når der ikke er en ældre tur.
+     */
+    fun step(names: List<String>, shown: String?, live: String?, dir: Int): Int {
+        var i = (if (shown == null) -1 else names.indexOf(shown)) + dir
+        while (i in names.indices && live != null && names[i].startsWith(live)) i += dir
+        return i.coerceIn(-1, names.size)
+    }
+
     /** Det, en deling kan tage med. Valget gemmes i indstillingerne som summen af de valgte dele. */
     const val PART_LOG = 1
     const val PART_WAVE = 2

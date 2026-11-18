@@ -21,15 +21,13 @@ object MapData {
         bursts.clear(); silent.clear(); marks.clear(); bearings.clear(); sessions = 0
     }
 
-    /** Læser logfilerne ind på kortet (kald fra en baggrundstråd). Returnerer antal målinger med position. */
-    fun load(ctx: Context, uris: List<Uri>): Int {
-        val t = read(ctx, uris)
+    /** Lægger [t], læst fra [count] logfiler, på kortet i stedet for det, der lå der. */
+    fun show(t: TripPoints, count: Int) {
         bursts.clear(); bursts.addAll(t.bursts)
         silent.clear(); silent.addAll(t.silent)
         marks.clear(); marks.addAll(t.marks)
         bearings.clear(); bearings.addAll(t.bearings)
-        sessions = uris.size
-        return t.bursts.size
+        sessions = count
     }
 
     /**
