@@ -63,6 +63,11 @@ class MeasureService : Service() {
         const val EXTRA_PHOTO = "photo"
         private const val EXTRA_KIND = "kind"
         const val ACTION_PPM = "ppm="
+        const val ACTION_BAND = "band="
+        private const val EXTRA_LO = "lo"
+        private const val EXTRA_HI = "hi"
+        /** Så længe efter at tuneren er flyttet, regnes det, der høres, ikke for en måling: tuneren falder først til ro. */
+        private const val SETTLE_MS = 300L
         const val EXTRA_PPM = "ppm"
         private const val EXTRA_HZ = "hz"
         private const val EXTRA_DB = "db"
@@ -110,6 +115,12 @@ class MeasureService : Service() {
         }
 
         /** Vælg mål mens der måles: en frekvens i Hz, eller null for intet mål. */
+        /** Flyt det bånd, der lyttes på, til [loHz]–[hiHz]. Turens eget bånd er hjemme; alt andet er et kig til siden. */
+        fun sendBand(ctx: Context, loHz: Double, hiHz: Double) {
+            if (!Hub.running) return
+            ctx.startService(Intent(ctx, MeasureService::class.java).setAction(ACTION_BAND).putExtra(EXTRA_LO, loHz).putExtra(EXTRA_HI, hiHz))
+        }
+
         fun sendTarget(ctx: Context, hz: Double?) {
             if (!Hub.running) return
             ctx.startService(Intent(ctx, MeasureService::class.java).setAction(ACTION_TARGET).putExtra(EXTRA_HZ, hz ?: Double.NaN))
@@ -124,6 +135,9 @@ class MeasureService : Service() {
     @Volatile private var detector: BurstDetector? = null
     /** En ny signalbredde venter, til intet signal er i gang. */
     @Volatile private var pendingBwHz: Double? = null
+    /** Et bånd, der skal lyttes på fra næste blok, og hvornår båndet sidst blev flyttet. */
+    @Volatile private var pendingBand: Pair<Double, Double>? = null
+    @Volatile private var bandChangedAt = 0L
     private var bwChangedAt = 0L
     /** Blokke modtaget i alt, og hvor mange der var gået, da den nuværende detektor begyndte at tælle fra nul. */
     private var blocksSeen = 0L
@@ -186,6 +200,10 @@ class MeasureService : Service() {
             ACTION_GAIN_SET -> chooseGain(intent.getDoubleExtra(EXTRA_DB, Double.NaN), intent.getBooleanExtra(EXTRA_PROTECT, true))
             ACTION_TARGET -> retarget(intent.getDoubleExtra(EXTRA_HZ, Double.NaN).takeUnless { it.isNaN() })
             ACTION_PPM -> changePpm(intent.getIntExtra(EXTRA_PPM, settings.ppm))
+            ACTION_BAND -> {
+                val lo = intent.getDoubleExtra(EXTRA_LO, Double.NaN); val hi = intent.getDoubleExtra(EXTRA_HI, Double.NaN)
+                if (Hub.running && hi > lo) pendingBand = lo to hi
+            }
             ACTION_RECONNECT -> if (Hub.running) connect()
             else -> if (!Hub.running) stopSelf()
         }
@@ -220,7 +238,8 @@ class MeasureService : Service() {
         tuneHz = cfg.tuneHz
         burstsInTick = 0; targetInTick = 0; strongestTarget = null; strongestAny = null; quietTicks = 0; anchorWall = 0
         blocksSeen = 0; frameBase = 0; ppmShiftHz = 0.0; ppmShiftAt = 0
-        pendingGain = null
+        pendingGain = null; pendingBand = null; bandChangedAt = 0
+        Hub.bandLoHz = cfg.bandLoHz; Hub.bandHiHz = cfg.bandHiHz; Hub.homeLoHz = cfg.bandLoHz; Hub.homeHiHz = cfg.bandHiHz
 
         wake = (getSystemService(POWER_SERVICE) as PowerManager)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "mink:maaling").apply { acquire(12 * 3600_000L) }
@@ -252,15 +271,7 @@ class MeasureService : Service() {
         Hub.targetHz = tracker!!.targetHz
         targetSince = System.currentTimeMillis()
         Hub.autoGain = settings.autoGain
-        detector = BurstDetector(cfg).apply {
-            onBurst = { onBurst(it) }
-            // vandfaldet viser det lyttede bånd med luft i hver side – det samme stykke, detektoren søger i
-            val binHz = cfg.sampleRate.toDouble() / cfg.n
-            val lo = maxOf(1, bandBinLo - (BurstDetector.EDGE_AIR_HZ / binHz).toInt())
-            val hi = minOf(cfg.n - 2, bandBinHi + (BurstDetector.EDGE_AIR_HZ / binHz).toInt())
-            Scope.configure(lo, hi - lo + 1, freqOfBin(lo - 0.5), binHz, cfg.n)
-            spectrumSink = { re, im, floor -> Scope.feed(re, im, floor) }
-        }
+        detector = listenOn(cfg)
 
         record(
             JSONObject().put("type", "meta").put("session", session).put("version", BuildConfig.VERSION_NAME)
@@ -283,6 +294,46 @@ class MeasureService : Service() {
             Log.w(TAG, "ingen GPS", e)
         }
         handler?.postDelayed(tickRun, TICK_MS)
+        Hub.changed()
+    }
+
+    /** En detektor for [cfg], med vandfaldet stillet på det samme bånd. */
+    private fun listenOn(cfg: BurstDetector.Config) = BurstDetector(cfg).apply {
+        onBurst = { this@MeasureService.onBurst(it) }
+        // vandfaldet viser det lyttede bånd med luft i hver side – det samme stykke, detektoren søger i
+        val binHz = cfg.sampleRate.toDouble() / cfg.n
+        val lo = maxOf(1, bandBinLo - (BurstDetector.EDGE_AIR_HZ / binHz).toInt())
+        val hi = minOf(cfg.n - 2, bandBinHi + (BurstDetector.EDGE_AIR_HZ / binHz).toInt())
+        Scope.configure(lo, hi - lo + 1, freqOfBin(lo - 0.5), binHz, cfg.n)
+        spectrumSink = { re, im, floor -> Scope.feed(re, im, floor) }
+    }
+
+    /**
+     * Flytter det bånd, der lyttes på, midt i en tur: brugeren har trukket vandfaldet til siden for at kigge på
+     * nabofrekvenserne, eller er vendt hjem til turens eget bånd. Tuneren flyttes, og detektoren og vandfaldet bygges
+     * om til det nye bånd. Sendere, der høres dér, gemmes som alle andre. Ligger målet uden for båndet, kan det ikke
+     * høres, og [tick] skriver så ikke stille punkter.
+     */
+    private fun applyBand(loHz: Double, hiHz: Double) {
+        val old = detector ?: return
+        if (loHz == old.cfg.bandLoHz && hiHz == old.cfg.bandHiHz) return
+        val cfg = old.cfg.copy(tuneHz = BurstDetector.tuneFor(loHz, hiHz, old.cfg.sampleRate), bandLoHz = loHz, bandHiHz = hiHz)
+        val det = listenOn(cfg)
+        detector = det
+        // den nye detektor tæller blokke fra nul; bølgeform-ringen tæller videre, så udsnittene skal forskydes
+        frameBase = blocksSeen
+        tuneHz = cfg.tuneHz
+        client?.changeFreq(cfg.tuneHz.toLong())
+        bandChangedAt = System.currentTimeMillis()
+        targetInTick = 0; strongestTarget = null
+        Hub.bandLoHz = loHz; Hub.bandHiHz = hiHz
+        // hjemme er alt som før; kun under et kig kan målet ligge uden for det, detektoren søger i
+        Hub.targetHeard = !Hub.away || BandShift.hears(det.centerLoHz, det.centerHiHz, tracker?.targetHz)
+        Hub.ppmSeq = 0
+        record(
+            JSONObject().put("type", "band").put("t", iso(bandChangedAt)).put("lo", loHz.toLong()).put("hi", hiHz.toLong())
+                .put("tune", cfg.tuneHz.toLong()).put("search_lo", det.centerLoHz.toLong()).put("search_hi", det.centerHiHz.toLong())
+        )
         Hub.changed()
     }
 
@@ -348,6 +399,8 @@ class MeasureService : Service() {
         if (pg != null && !det.busy) { pendingGain = null; applyGain(pg) }
         val pb = pendingBwHz
         if (pb != null && !det.busy) { pendingBwHz = null; applySignalBw(pb) }
+        // et kig til siden venter ikke på, at et signal bliver færdigt: brugeren har bedt om at se et andet sted nu
+        pendingBand?.let { pendingBand = null; applyBand(it.first, it.second) }
     }
 
     /**
@@ -370,6 +423,7 @@ class MeasureService : Service() {
 
     private fun onBurst(b: BurstDetector.Burst) {
         val g = gain ?: return
+        if (b.tStartMs - bandChangedAt < SETTLE_MS) return
         val tr = tracker ?: return
         val gainDb = appliedGain
         val level = b.peakDbfs - gainDb
@@ -454,13 +508,16 @@ class MeasureService : Service() {
             Hub.floorDb = st.floorDb
             Hub.clipPct = st.clipPct
             // uden et valgt mål giver "stille" ingen mening: der er intet, der kan være stille
-            val hasTarget = tracker?.targetHz != null && System.currentTimeMillis() - targetSince >= TICK_MS - 500
+            // og heller ikke, når båndet er flyttet væk fra målet, eller først kom tilbage midt i perioden
+            val now = System.currentTimeMillis()
+            val hasTarget = tracker?.targetHz != null && now - targetSince >= TICK_MS - 500 && Hub.targetHeard && now - bandChangedAt >= TICK_MS - 500
             val o = JSONObject().put("type", "tick").put("t", iso(System.currentTimeMillis()))
             putLocation(o, loc, false)
             o.put("gain", gain?.db ?: 0.0).put("floor", st.floorDb?.let { r1(it) } ?: JSONObject.NULL)
                 .put("bursts", burstsInTick).put("tb", if (hasTarget) targetInTick else JSONObject.NULL).put("wide", st.wideFrames)
                 .put("maxsnr", st.maxSnr?.let { r1(it) } ?: JSONObject.NULL)
                 .put("clip", r1(st.clipPct)).put("frames", st.frames)
+            if (!Hub.targetHeard) o.put("away", true)
             record(o)
             if (targetInTick == 0) {
                 quietTicks++
@@ -533,6 +590,11 @@ class MeasureService : Service() {
         targetInTick = 0; strongestTarget = null
         Hub.targetHz = tr.targetHz
         Hub.targetAtEdge = false
+        // et mål valgt under et kig til siden gør det sted til turens bånd: dér skal der lyttes resten af turen
+        val det = detector
+        val inReach = det == null || BandShift.hears(det.centerLoHz, det.centerHiHz, tr.targetHz)
+        if (Hub.away && tr.targetHz != null && inReach) { Hub.homeLoHz = Hub.bandLoHz; Hub.homeHiHz = Hub.bandHiHz }
+        Hub.targetHeard = !Hub.away || inReach
         Hub.sources = tr.snapshot()
         val picked = tr.snapshot().firstOrNull { it.target }
         record(

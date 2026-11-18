@@ -83,7 +83,8 @@ Skrives hvert 10. sekund.
 | Felt | Betydning |
 |---|---|
 | `bursts` | Målinger i perioden, alle kilder |
-| `tb` | Målinger fra målet. `0` er et stille punkt. `null`, hvis intet mål var valgt, eller det blev valgt midt i perioden |
+| `tb` | Målinger fra målet. `0` er et stille punkt. `null`, hvis intet mål var valgt, det blev valgt midt i perioden, eller målet ikke kunne høres i hele perioden, fordi båndet var flyttet væk fra det (se `away` og posten `band`) |
+| `away` | `true`, når målet lå uden for det bånd, der blev lyttet på. Feltet mangler ellers |
 | `wide` | Blokke med kraftig, bredbåndet energi (fx LoRa) |
 | `maxsnr` | Højeste dB over støjen i perioden, også under tærsklen |
 | `frames` | Antal blokke i perioden |
@@ -97,6 +98,7 @@ Skrives hvert 10. sekund.
 | `gain` | `from`, `to`, `why` | Gain skifter. `why` er `clip` eller `kraftigt` (beskyttelsen skruer ned), `tilbage` (op mod det valgte igen) eller `manuel` |
 | `ppm` | `to` | PPM-korrektionen ændres. Frekvenserne i de følgende poster ligger på den nye plads |
 | `signal_bw` | `from`, `to` (Hz) | Signalbredden stiller sig ind på målet |
+| `band` | `lo`, `hi`, `tune`, `search_lo`, `search_hi` (Hz) | Brugeren flytter det bånd, der lyttes på, ved at trække vandfaldet til siden. Felterne betyder det samme som `band_lo`, `band_hi`, `tune`, `search_lo` og `search_hi` i `meta` og gælder for de følgende poster. Er `lo` og `hi` de samme som i `meta`, er båndet igen turens eget. Målinger efter en `band`-post kan ligge uden for båndet i `meta` |
 | `bearing` | `hdg`, `tilt`, `lvl`, `snr`, `best`, `n`, `cmp`, `ut`, `flat`, `photo` | Brugeren tager en pejling |
 
 Felterne i `bearing`:

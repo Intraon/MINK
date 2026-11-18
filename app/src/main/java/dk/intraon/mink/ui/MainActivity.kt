@@ -38,6 +38,7 @@ import dk.intraon.mink.core.Settings
 import dk.intraon.mink.direction.CameraPane
 import dk.intraon.mink.map.MapData
 import dk.intraon.mink.map.PointsOverlay
+import dk.intraon.mink.measure.BandShift
 import dk.intraon.mink.measure.MeasureService
 import dk.intraon.mink.radio.Calibrate
 import dk.intraon.mink.replay.Replay
@@ -112,6 +113,9 @@ class MainActivity : Activity() {
     private var settingsView: View? = null
     private lateinit var tripTv: TextView
     private lateinit var tripBar: View
+    private lateinit var lookBar: View
+    private lateinit var lookTv: TextView
+    private lateinit var lookBack: Button
     private var follow = true
     /** De tidligere ture, kortet viser. Tom = kun den aktuelle tur. */
     private var shown: List<JsonlLog.Entry> = emptyList()
@@ -315,9 +319,20 @@ class MainActivity : Activity() {
         col.addView(tabs, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         val mainBox = FrameLayout(this)
         mapBoxView = mapBox
-        waterfall = WaterfallView(this) { hz -> onWaterfallTap(hz) }
+        waterfall = WaterfallView(this, { hz -> onWaterfallTap(hz) }, { byHz -> onWaterfallPan(byHz) })
         mainBox.addView(mapBox, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         mainBox.addView(waterfall, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        // mens der kigges ved siden af turens bånd: hvad der ses, om målet måles imens, og vejen tilbage
+        lookTv = tv(13f, Ui.BG)
+        lookBack = button("Tilbage", Ui.BG) { MeasureService.sendBand(this, Hub.homeLoHz, Hub.homeHiHz) }.apply { textSize = 13f; setPadding(dp(12), 0, dp(12), 0) }
+        lookBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; visibility = View.GONE
+            setPadding(dp(12), dp(8), dp(8), dp(8))
+            background = GradientDrawable().apply { setColor(Ui.ACCENT); cornerRadius = dp(10).toFloat() }
+            addView(lookTv, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginEnd = dp(10) })
+            addView(lookBack, LinearLayout.LayoutParams(WRAP_CONTENT, dp(44)))
+        }
+        mainBox.addView(lookBar, FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP).apply { setMargins(dp(8), dp(90), dp(8), 0) })
         // en tidligere tur som vandfald; ligger på fanen Vandfald i stedet for det levende, mens turen er åben
         replayPane = ReplayPane(this, onPlace = { fix -> pointsLayer.cursor = fix?.let { it.lat to it.lon }; map.invalidate() }, onClose = { showOnMap(emptyList(), 0) })
         mainBox.addView(replayPane, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
@@ -398,8 +413,22 @@ class MainActivity : Activity() {
         setTarget(hit ?: tapHz)
     }
 
+    /**
+     * Et træk til siden i vandfaldet: det bånd, der lyttes på, flyttes [byHz], så nabofrekvenserne kan ses. Ligger
+     * målet uden for det nye bånd, kan det ikke måles imens.
+     */
+    private fun onWaterfallPan(byHz: Double) {
+        if (!Hub.running || Hub.bandHiHz <= Hub.bandLoHz) return
+        val to = BandShift.moved(Hub.bandLoHz, Hub.bandHiHz, byHz, Hub.homeLoHz, Hub.homeHiHz) ?: return
+        MeasureService.sendBand(this, to.first, to.second)
+    }
+
     private fun setTarget(hz: Double?) {
         settings.targetMhz = hz?.let { Math.round(it / 100.0) / 10_000.0 }
+        // et mål valgt under et kig til siden ligger uden for det gemte bånd: næste tur skal også lytte dér
+        if (hz != null && Hub.running && Hub.away && hz in Hub.bandLoHz..Hub.bandHiHz) {
+            settings.bandLoMhz = Math.round(Hub.bandLoHz / 1000.0) / 1000.0; settings.bandHiMhz = Math.round(Hub.bandHiHz / 1000.0) / 1000.0
+        }
         if (Hub.running) MeasureService.sendTarget(this, hz) else Hub.targetHz = hz
         toast(if (hz == null) "Intet mål valgt" else "Mål: ${Ui.mhz(hz)} MHz")
         render()
@@ -807,9 +836,12 @@ class MainActivity : Activity() {
         val age = if (last != null) now - last.t - last.durMs else Long.MAX_VALUE
         val fresh = age < max(expect * 3 / 2, 3000L)
         val stale = age < max(expect * 3, 6000L)
-        if (last == null || snr == null || (!stale && running)) {
+        // der kigges et sted, hvor målet ikke kan høres: tallet og pilen holder pause i stedet for at tælle stilhed
+        val looking = running && !Hub.targetHeard
+        if (looking || last == null || snr == null || (!stale && running)) {
             bigTv.text = "—"; bigTv.setTextColor(Ui.DIM)
             subTv.text = when {
+                looking -> "målet måles ikke, mens du kigger"
                 running && Hub.targetHz == null -> "vælg et mål i vandfaldet"
                 last != null && running -> "intet hørt i ${age / 1000} s"
                 running -> "lytter …"
@@ -829,8 +861,8 @@ class MainActivity : Activity() {
         // trend
         val delta = Hub.trendDelta
         val limit = if (Hub.trendUncertain) 3.5 else 2.0
-        if (delta == null || last == null || (!stale && running)) {
-            arrowTv.text = "▬"; arrowTv.setTextColor(0xFF3C4043.toInt()); deltaTv.text = ""; trendTv.text = ""
+        if (looking || delta == null || last == null || (!stale && running)) {
+            arrowTv.text = "▬"; arrowTv.setTextColor(0xFF3C4043.toInt()); deltaTv.text = ""; trendTv.text = if (looking) "pause" else ""
         } else {
             val (sym, color, label) = when {
                 delta >= limit -> Triple("▲", Ui.GREEN, "tættere")
@@ -845,7 +877,7 @@ class MainActivity : Activity() {
         // detaljer
         detailTv.text = if (last?.level == null) {
             when {
-                running -> "Finder smalle signaler i ${Ui.mhz(settings.bandLoMhz * 1e6)}–${Ui.mhz(settings.bandHiMhz * 1e6)} MHz"
+                running -> "Finder smalle signaler i ${Ui.mhz(if (Hub.bandLoHz > 0) Hub.bandLoHz else settings.bandLoMhz * 1e6)}–${Ui.mhz(if (Hub.bandHiHz > 0) Hub.bandHiHz else settings.bandHiMhz * 1e6)} MHz"
                 !driverOk -> "Mangler appen \"Rtl-sdr driver\""
                 dongle == true -> "RTL-SDR fundet – tryk Start"
                 dongle == null -> "USB-enhed fundet, men ikke genkendt som RTL-SDR – prøv Start"
@@ -900,6 +932,14 @@ class MainActivity : Activity() {
             else -> null
         }
         warnTv.visibility = if (warn == null) View.GONE else View.VISIBLE
+        val away = running && Hub.away && tab == 0 && !replayPane.active
+        lookBar.visibility = if (away) View.VISIBLE else View.GONE
+        if (away) {
+            val where = "Du kigger på ${String.format(Ui.DA, "%.3f", Hub.bandLoHz / 1e6)}–${String.format(Ui.DA, "%.3f", Hub.bandHiHz / 1e6)} MHz"
+            val what = when { Hub.targetHz == null -> ""; Hub.targetHeard -> "\nMålet måles stadig."; else -> "\nMålet måles ikke imens." }
+            lookTv.text = SpannableStringBuilder(where + what).apply { setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, where.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
+            lookBack.text = if (Hub.targetHz != null && !Hub.targetHeard) "Tilbage til målet" else "Tilbage"
+        }
         if (warn != null) warnTv.text = warn
 
         // kort og graf
