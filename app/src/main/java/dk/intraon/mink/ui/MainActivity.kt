@@ -118,6 +118,8 @@ class MainActivity : Activity() {
     private var tripIndex = -1
     /** De tidligere ture, kortet viser. Tom = kun den aktuelle tur. */
     private var shown: List<JsonlLog.Entry> = emptyList()
+    /** Det udsnit, kortet skal vise, når det får en størrelse. Det har ingen, før fanen Kort har været vist. */
+    private var waitingBox: BoundingBox? = null
     private lateinit var replayPane: ReplayPane
     private var driverOk = true
     private var dongle: Boolean? = null
@@ -275,6 +277,8 @@ class MainActivity : Activity() {
             controller.setCenter(GeoPoint(settings.lastLat, settings.lastLon))
             pointsLayer = PointsOverlay(resources.displayMetrics.density)
             overlays.add(pointsLayer)
+            // et udsnit, der blev bedt om, før kortet havde en størrelse, vises, når kortet har fået sin plads
+            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> if (waitingBox != null) post { waitingBox?.let { fit(it) } } }
             // OpenStreetMap kræver synlig kildeangivelse på kortet
             overlays.add(org.osmdroid.views.overlay.CopyrightOverlay(context).apply { setAlignRight(true); setTextSize(10) })
             setOnTouchListener { _, ev ->
@@ -664,6 +668,18 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    /**
+     * Lader kortet vise udsnittet [box] med en kant omkring. Et kort uden størrelse kan ikke regne et zoomtrin ud:
+     * osmdroid får et ugyldigt tal og bliver hængende i en løkke på hovedtråden. Udsnittet gemmes derfor, til kortet
+     * har fået sin plads på skærmen.
+     */
+    private fun fit(box: BoundingBox) {
+        val edge = dp(24)
+        if (map.width <= 2 * edge || map.height <= 2 * edge) { waitingBox = box; return }
+        waitingBox = null
+        map.zoomToBoundingBox(box, false, edge)
+    }
+
     /** Navnet på det, kortet viser: "Aktuel tur", turens navn dannet med [title], eller antallet af ture. */
     private fun shownName(title: (String) -> String): String = when {
         shown.isEmpty() -> "Aktuel tur"
@@ -682,7 +698,7 @@ class MainActivity : Activity() {
     private fun showOnMap(entries: List<JsonlLog.Entry>, thenTab: Int = 1) {
         if (settingsView != null) closeSettings()
         shown = entries
-        if (entries.isEmpty()) { tripIndex = -1; MapData.clear(); replayPane.close(); showTab(thenTab); render(); return }
+        if (entries.isEmpty()) { tripIndex = -1; waitingBox = null; MapData.clear(); replayPane.close(); showTab(thenTab); render(); return }
         val single = entries.singleOrNull()
         Thread {
             val n = MapData.load(this, entries.map { it.uri })
@@ -695,8 +711,7 @@ class MainActivity : Activity() {
                 val lats = pts.mapNotNull { it.lat }; val lons = pts.mapNotNull { it.lon }
                 if (lats.isNotEmpty()) {
                     follow = false; updateFollow()
-                    val box = BoundingBox(lats.max() + 0.002, lons.max() + 0.004, lats.min() - 0.002, lons.min() - 0.004)
-                    map.zoomToBoundingBox(box, false, dp(24))
+                    fit(BoundingBox(lats.max() + 0.002, lons.max() + 0.004, lats.min() - 0.002, lons.min() - 0.004))
                 }
                 if (replay != null && single != null) replayPane.open(TripFiles.title(single.name), replay, wave?.uri) else replayPane.close()
                 showTab(thenTab)
