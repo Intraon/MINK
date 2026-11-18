@@ -4,6 +4,18 @@ import org.json.JSONObject
 
 /** Læser GitHubs svar om den nyeste udgivelse og afgør, om den er nyere end den installerede version. Ren Kotlin. */
 object Releases {
+    /** Så længe går der, fra GitHub har svaret, til appen selv spørger igen. */
+    const val EVERY_MS = 12 * 3600_000L
+    /** Så længe går der, fra et tjek blev uden svar, til appen selv prøver igen. */
+    const val RETRY_MS = 3600_000L
+
+    /**
+     * Er det tid til, at appen selv ser efter en ny version? [answeredAt] er sidste gang, GitHub svarede, og
+     * [failedAt] sidste gang, et tjek blev uden svar (0 = aldrig). Et tjek uden svar har ikke fortalt noget, så det
+     * udskyder ikke det næste med et halvt døgn, kun med en time.
+     */
+    fun due(now: Long, answeredAt: Long, failedAt: Long): Boolean = now - answeredAt >= EVERY_MS && now - failedAt >= RETRY_MS
+
     /** Adressen, hvor GitHub fortæller om den nyeste udgivelse i [repo] ("ejer/navn"). */
     fun latestUrl(repo: String) = "https://api.github.com/repos/$repo/releases/latest"
     fun pageUrl(repo: String) = "https://github.com/$repo"

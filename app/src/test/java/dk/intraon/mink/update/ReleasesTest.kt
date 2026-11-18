@@ -55,4 +55,13 @@ class ReleasesTest {
         assertFalse("kan ikke læses: tilbyd ingenting", Releases.newer("nightly", "0.4.460694"))
     }
 
+
+    @Test fun etTjekUdenSvarUdskyderDetNaesteMedEnTimeOgIkkeEtHalvtDoegn() {
+        val hour = 3600_000L; val now = 100 * hour
+        assertFalse("GitHub svarede for to timer siden", Releases.due(now, now - 2 * hour, 0))
+        assertTrue("sidste svar er 13 timer gammelt", Releases.due(now, now - 13 * hour, 0))
+        assertFalse("der blev prøvet uden held for ti minutter siden", Releases.due(now, now - 13 * hour, now - hour / 6))
+        assertTrue("forsøget uden held er to timer gammelt", Releases.due(now, now - 13 * hour, now - 2 * hour))
+        assertTrue("en ny installation har aldrig spurgt", Releases.due(now, 0, 0))
+    }
 }

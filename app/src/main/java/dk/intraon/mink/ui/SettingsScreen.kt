@@ -43,7 +43,7 @@ class SettingsScreen(private val a: MainActivity, private val s: Settings, priva
         note("Åben kildekode under MIT-licensen. Kortet er © OpenStreetMap-bidragyderne. Tuner: ${Hub.tuner}.\nLog: ${JsonlLog.DIR}/${JsonlLog.PREFIX}<tid>.jsonl.txt (+ .iq.wav) · billeder: ${FigureExport.DIR}")
         // gælder med det samme; kontakten står under Gem-knappen
         toggle("Se selv efter nye versioner", a.settings.autoUpdate).setOnCheckedChangeListener { _, on -> a.settings.autoUpdate = on }
-        note("Appen spørger GitHub, om der er udgivet en nyere version, højst to gange i døgnet og aldrig mens der måles. Der sendes ikke andet end forespørgslen.")
+        note("Når du åbner appen, spørger den GitHub, om der er udgivet en nyere version. Det sker højst to gange i døgnet og aldrig mens der måles. Får den ikke svar, prøver den igen tidligst en time senere. Der sendes ikke andet end forespørgslen.")
         action("Søg efter opdatering nu", Ui.BUTTON) { a.updater.check(quiet = false) }
         if (BuildConfig.REPO.isNotEmpty()) action("Kildekode på GitHub", Ui.BUTTON) { a.updater.openInBrowser(Releases.pageUrl(BuildConfig.REPO)) }
         action("intraon.dk", Ui.BUTTON) { a.updater.openInBrowser("https://intraon.dk") }
