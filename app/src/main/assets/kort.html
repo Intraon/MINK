@@ -105,14 +105,18 @@ const grund = BASE && {
 };
 $('kilde').textContent = grund ? 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap' : 'Uden baggrundskort: kortdata kunne ikke hentes, da filen blev lavet.';
 
-const lærred=$('kort'), ctx=lærred.getContext('2d');
+// Kortet tegnes i et gemt billede, der er større end skærmen. Når kortet flyttes, flyttes kun billedet, og der
+// tegnes først om, når kanten nås, eller når der er zoomet. Så følger kortet fingeren, også med mange målinger.
+const lærred=$('kort'), hoved=lærred.getContext('2d'), lag=document.createElement('canvas'), ctx=lag.getContext('2d');
+let TW=0, TH=0, gemt=null, senere=0;
 const vis={x:0.5,y:0.3,z:12};
 let W=0,H=0,dpr=1, ventende=false;
 const S=()=>256*Math.pow(2,vis.z);
-const sx=x=>(x-vis.x)*S()+W/2, sy=y=>(y-vis.y)*S()+H/2;
-const skærm=(lat,lon)=>[sx(mx(lon)),sy(my(lat))];
+const sx=x=>(x-vis.x)*S()+TW/2, sy=y=>(y-vis.y)*S()+TH/2;          // i det gemte billede
+const px=x=>(x-vis.x)*S()+W/2, py=y=>(y-vis.y)*S()+H/2;            // på skærmen
+const punkt=(lat,lon)=>[sx(mx(lon)),sy(my(lat))], skærm=(lat,lon)=>[px(mx(lon)),py(my(lat))];
 function bed(){ if(!ventende){ ventende=true; requestAnimationFrame(()=>{ventende=false; tegn();}); } }
-function tilpas(){ dpr=window.devicePixelRatio||1; W=window.innerWidth; H=window.innerHeight; lærred.width=W*dpr; lærred.height=H*dpr; bed(); }
+function tilpas(){ dpr=window.devicePixelRatio||1; W=window.innerWidth; H=window.innerHeight; lærred.width=W*dpr; lærred.height=H*dpr; gemt=null; bed(); }
 window.addEventListener('resize',tilpas);
 function zoomVed(px,py,nyZ){
   nyZ=Math.max(8,Math.min(20,nyZ)); const s0=S(), wx=vis.x+(px-W/2)/s0, wy=vis.y+(py-H/2)/s0;
@@ -168,10 +172,10 @@ function opdatér(){
     top.appendChild(a);
   }
   if(!valgt.length) top.innerHTML='<span class="lille">Ingen målinger med det valg.</span>';
-  bed();
+  gemt=null; bed();
 }
 
-function synlig(b){ const s=S(); return (b[2]-vis.x)*s+W/2>=-20 && (b[0]-vis.x)*s+W/2<=W+20 && (b[3]-vis.y)*s+H/2>=-20 && (b[1]-vis.y)*s+H/2<=H+20; }
+function synlig(b){ const s=S(); return (b[2]-vis.x)*s+TW/2>=-20 && (b[0]-vis.x)*s+TW/2<=TW+20 && (b[3]-vis.y)*s+TH/2>=-20 && (b[1]-vis.y)*s+TH/2<=TH+20; }
 function sti(g){ const p=g.p; ctx.moveTo(sx(p[0]),sy(p[1])); for(let i=2;i<p.length;i+=2) ctx.lineTo(sx(p[i]),sy(p[i+1])); }
 // Fladerne er skåret i fliser. En tynd kant i fladens egen farve lukker sprækkerne mellem dem.
 function flader(liste,farven,kant){ ctx.beginPath(); for(const g of liste) if(synlig(g.b)) sti(g); ctx.fillStyle=farven; ctx.fill('evenodd'); ctx.strokeStyle=kant||farven; ctx.lineWidth=kant?0.6:1.2; ctx.stroke(); }
@@ -204,7 +208,7 @@ function tegnGrund(){
       ctx.font='11px system-ui,sans-serif';
       if(bi<0||bedst<ctx.measureText(g.navn).width+14) continue;
       const x=(sx(p[bi])+sx(p[bi+2]))/2, y=(sy(p[bi+1])+sy(p[bi+3]))/2;
-      if(x<0||x>W||y<0||y>H||sat.some(s=>s.n===g.navn&&Math.hypot(s.x-x,s.y-y)<260)) continue;
+      if(x<0||x>TW||y<0||y>TH||sat.some(s=>s.n===g.navn&&Math.hypot(s.x-x,s.y-y)<260)) continue;
       sat.push({n:g.navn,x,y});
       let v=Math.atan2(sy(p[bi+3])-sy(p[bi+1]),sx(p[bi+2])-sx(p[bi])); if(v>Math.PI/2) v-=Math.PI; if(v<-Math.PI/2) v+=Math.PI;
       ctx.save(); ctx.translate(x,y); ctx.rotate(v); tekst(g.navn,0,0,'11px system-ui,sans-serif','#555'); ctx.restore();
@@ -212,7 +216,7 @@ function tegnGrund(){
   }
   for(const s of grund.steder){
     if((s.rang===1&&z<11.5)||(s.rang===2&&z<13.5)) continue;
-    const x=sx(s.x), y=sy(s.y); if(x<-50||x>W+50||y<-20||y>H+20) continue;
+    const x=sx(s.x), y=sy(s.y); if(x<-50||x>TW+50||y<-20||y>TH+20) continue;
     tekst(s.navn,x,y,(s.rang===0?'600 15px':s.rang===1?'600 12.5px':'12px')+' system-ui,sans-serif','#333');
   }
 }
@@ -227,14 +231,16 @@ function mærkat(t,x,y,kant){
   return {x0:x,y0:y-h/2,x1:x+w,y1:y+h/2};
 }
 function retning(b){ return b.center!=null?b.center:b.best!=null?b.best:b.hdg; }
-function tegn(){
-  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.fillStyle='#f4f1ea'; ctx.fillRect(0,0,W,H);
+function gengiv(){
+  const kant=Math.round(Math.max(W,H)*0.35), tæthed=Math.min(dpr,2);
+  TW=W+2*kant; TH=H+2*kant; lag.width=TW*tæthed; lag.height=TH*tæthed;
+  ctx.setTransform(tæthed,0,0,tæthed,0,0); ctx.fillStyle='#f4f1ea'; ctx.fillRect(0,0,TW,TH);
   if(grund) tegnGrund();
   ctx.lineCap='round'; ctx.lineJoin='round';
   const z=vis.z, bredde=z<=12?3.5:z<=14?5:z<=16?7:9, syn=[];
   for(const s of stykker){
     const a=[sx(s.a.x),sy(s.a.y)], b=s.a===s.b?a:[sx(s.b.x),sy(s.b.y)];
-    if((a[0]<-20&&b[0]<-20)||(a[1]<-20&&b[1]<-20)||(a[0]>W+20&&b[0]>W+20)||(a[1]>H+20&&b[1]>H+20)) continue;
+    if((a[0]<-20&&b[0]<-20)||(a[1]<-20&&b[1]<-20)||(a[0]>TW+20&&b[0]>TW+20)||(a[1]>TH+20&&b[1]>TH+20)) continue;
     syn.push([s,a,b]);
   }
   const streg=(a,b)=>{ ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0]+(a[0]===b[0]&&a[1]===b[1]?0.01:0),b[1]); ctx.stroke(); };
@@ -252,7 +258,7 @@ function tegn(){
     for(const b of d.bearings){
       const grader=retning(b); if(grader==null) continue;
       const klar=b.swing!=null&&b.swing>=15&&!b.poor, svag=!klar&&b.swing!=null&&b.swing>=10;
-      const fra=skærm(b.lat,b.lon), til=skærm(...destination(b.lat,b.lon,grader,klar?2000:svag?1000:500));
+      const fra=punkt(b.lat,b.lon), til=punkt(...destination(b.lat,b.lon,grader,klar?2000:svag?1000:500));
       ctx.strokeStyle=LILLA; ctx.globalAlpha=klar?0.95:0.75; ctx.lineWidth=klar?3:2; ctx.setLineDash(klar?[]:svag?[8,6]:[2,6]);
       ctx.beginPath(); ctx.moveTo(fra[0],fra[1]); ctx.lineTo(til[0],til[1]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
       ctx.beginPath(); ctx.arc(fra[0],fra[1],6,0,7); ctx.fillStyle=LILLA; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle='#fff'; ctx.stroke();
@@ -261,15 +267,24 @@ function tegn(){
       mål.push(Object.assign(r,{cx:fra[0],cy:fra[1],åbn:()=>visPejling(b,d)}));
     }
     for(const m of d.marks){
-      const p=skærm(m.lat,m.lon), r=z>=12.5?mærkat('M'+(m.n||''),p[0]+6,p[1]-14,'#111'):{x0:0,y0:0,x1:-1,y1:-1};
+      const p=punkt(m.lat,m.lon), r=z>=12.5?mærkat('M'+(m.n||''),p[0]+6,p[1]-14,'#111'):{x0:0,y0:0,x1:-1,y1:-1};
       ctx.beginPath(); ctx.arc(p[0],p[1],4,0,7); ctx.fillStyle='#111'; ctx.fill();
       mål.push(Object.assign(r,{cx:p[0],cy:p[1],åbn:()=>pop(m.lat,m.lon,'<b>Mærke '+(m.n||'')+'</b>'+(m.kind==='possible'?' (mulig kilde)':m.kind==='found'?' (kilde fundet)':'')+'<br>'+tid(d.t0+m.t,d.off)+'<br>'+d.label)}));
     }
   }
-  // målestok
-  const mpp=40075016.686*Math.cos(latAf(vis.y)*Math.PI/180)/S(); let m=1; for(const k of [20,50,100,200,500,1000,2000,5000,10000,20000]) if(k/mpp<=130) m=k;
-  ctx.fillStyle='rgba(255,255,255,.85)'; ctx.fillRect(8,H-30,m/mpp+14,22); ctx.strokeStyle='#222'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(14,H-22); ctx.lineTo(14,H-14); ctx.lineTo(14+m/mpp,H-14); ctx.lineTo(14+m/mpp,H-22); ctx.stroke();
-  ctx.fillStyle='#222'; ctx.font='11px system-ui,sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText(m>=1000?(m/1000)+' km':m+' m',19,H-18);
+  gemt={x:vis.x,y:vis.y,z:vis.z};
+}
+function tegn(){
+  if(!gemt) gengiv();
+  const k=Math.pow(2,vis.z-gemt.z), s=S(), cx=(gemt.x-vis.x)*s+W/2, cy=(gemt.y-vis.y)*s+H/2, bw=TW*k, bh=TH*k;
+  if(k===1&&(cx-bw/2>0||cy-bh/2>0||cx+bw/2<W||cy+bh/2<H)){ gengiv(); tegn(); return; }
+  hoved.setTransform(dpr,0,0,dpr,0,0); hoved.fillStyle='#f4f1ea'; hoved.fillRect(0,0,W,H);
+  hoved.drawImage(lag,cx-bw/2,cy-bh/2,bw,bh);
+  // under zoom vises det gemte billede forstørret; det tegnes skarpt, når fingrene har ligget stille et øjeblik
+  if(k!==1){ clearTimeout(senere); senere=setTimeout(()=>{ gengiv(); bed(); },140); }
+  const mpp=40075016.686*Math.cos(latAf(vis.y)*Math.PI/180)/S(); let m=1; for(const n of [20,50,100,200,500,1000,2000,5000,10000,20000]) if(n/mpp<=130) m=n;
+  hoved.fillStyle='rgba(255,255,255,.85)'; hoved.fillRect(8,H-30,m/mpp+14,22); hoved.strokeStyle='#222'; hoved.lineWidth=2; hoved.beginPath(); hoved.moveTo(14,H-22); hoved.lineTo(14,H-14); hoved.lineTo(14+m/mpp,H-14); hoved.lineTo(14+m/mpp,H-22); hoved.stroke();
+  hoved.fillStyle='#222'; hoved.font='11px system-ui,sans-serif'; hoved.textAlign='left'; hoved.textBaseline='alphabetic'; hoved.fillText(m>=1000?(m/1000)+' km':m+' m',19,H-18);
   if(åben){ const p=skærm(åben.lat,åben.lon); const e=$('pop'); e.style.left=p[0]+'px'; e.style.top=p[1]+'px'; }
 }
 
@@ -294,10 +309,13 @@ function visPejling(b,d){
   pop(b.lat,b.lon,t);
 }
 function tryk(x,y){
-  for(const m of mål) if((x>=m.x0&&x<=m.x1&&y>=m.y0&&y<=m.y1)||Math.hypot(x-m.cx,y-m.cy)<=14){ m.åbn(); return; }
+  // mærkaternes pladser kendes i det gemte billede, så det skal passe med det, der ses
+  if(!gemt||gemt.z!==vis.z){ clearTimeout(senere); gengiv(); bed(); }
+  const bx=x-((gemt.x-vis.x)*S()+W/2-TW/2), by=y-((gemt.y-vis.y)*S()+H/2-TH/2);
+  for(const m of mål) if((bx>=m.x0&&bx<=m.x1&&by>=m.y0&&by<=m.y1)||Math.hypot(bx-m.cx,by-m.cy)<=14){ m.åbn(); return; }
   let bedst=null, bd=20;
   for(const p of punkter){
-    const d=Math.hypot(sx(p.x)-x,sy(p.y)-y); if(d>20) continue;
+    const d=Math.hypot(px(p.x)-x,py(p.y)-y); if(d>20) continue;
     if(!bedst||d<bd-6||(Math.abs(d-bd)<=6&&(p.lvl??-999)>(bedst.lvl??-999))){ bedst=p; bd=Math.min(bd,d); }
   }
   if(bedst) visMåling(bedst); else lukPop();
@@ -329,7 +347,7 @@ DATA.forEach(d=>{
 $('min').min=LAV; $('min').max=HØJ; $('min').value=LAV;
 $('s-lav').textContent=tal(LAV,0)+' dB svagt'; $('s-midt').textContent=tal((LAV+HØJ)/2,0); $('s-hoej').textContent='kraftigt '+tal(HØJ,0)+' dB';
 $('min').oninput=e=>{ tilstand.min=+e.target.value; opdatér(); };
-$('l-stille').onchange=opdatér; $('l-pejl').onchange=bed;
+$('l-stille').onchange=opdatér; $('l-pejl').onchange=()=>{ gemt=null; bed(); };
 const panel=$('panel'), fold=$('fold');
 fold.onclick=()=>{ const lukket=panel.classList.toggle('lukket'); fold.textContent=lukket?'Vis valg':'Skjul'; };
 if(window.innerWidth<700) fold.onclick();
