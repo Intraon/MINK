@@ -41,4 +41,16 @@ class TripFilesTest {
         assertTrue("et billede af turens vandfald, taget i dag", TripFiles.inTrip(waterfall, old, "20261116_230110"))
         assertFalse(TripFiles.inTrip(waterfall, newest, null))
     }
+
+    @Test fun bladringGaarFraDenVisteTurOgsaaNaarEnNyTurErBegyndt() {
+        val old = listOf("mink_20261118_145148.jsonl.txt", "mink_20261118_130210.jsonl.txt", "mink_20261117_150200.jsonl.txt")
+        assertEquals(1, TripFiles.step(old, old[0], null, +1))
+        // en måling er startet, mens turen fra 13.02 blev vist, så alle pladser er rykket én
+        val now = listOf("mink_20261118_153000.jsonl.txt") + old
+        assertEquals("ældre end 13.02 er turen fra i går", 3, TripFiles.step(now, old[1], "mink_20261118_153000", +1))
+        assertEquals("nyere end 13.02 er 14.51", 1, TripFiles.step(now, old[1], "mink_20261118_153000", -1))
+        assertEquals("den tur, der kører, springes over på vej mod den aktuelle", -1, TripFiles.step(now, old[0], "mink_20261118_153000", -1))
+        assertEquals("fra den aktuelle tur er den første den nyeste, der ikke kører", 1, TripFiles.step(now, null, "mink_20261118_153000", +1))
+        assertEquals("der er ingen ældre", now.size, TripFiles.step(now, old[2], "mink_20261118_153000", +1))
+    }
 }

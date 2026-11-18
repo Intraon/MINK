@@ -113,13 +113,12 @@ class MainActivity : Activity() {
     private lateinit var tripTv: TextView
     private lateinit var tripBar: View
     private var follow = true
-    /** Ture, der kan bladres i (nyeste først), og hvilken der vises: -1 = den aktuelle tur eller flere ture på én gang. */
-    private var trips: List<JsonlLog.Entry> = emptyList()
-    private var tripIndex = -1
     /** De tidligere ture, kortet viser. Tom = kun den aktuelle tur. */
     private var shown: List<JsonlLog.Entry> = emptyList()
     /** Det udsnit, kortet skal vise, når det får en størrelse. Det har ingen, før fanen Kort har været vist. */
     private var waitingBox: BoundingBox? = null
+    /** Nummeret på den seneste anmodning om at vise ture. En indlæsning, der hører til en ældre, bruges ikke. */
+    private var showRequest = 0
     private lateinit var replayPane: ReplayPane
     private var driverOk = true
     private var dongle: Boolean? = null
@@ -536,7 +535,7 @@ class MainActivity : Activity() {
         val caption = "MINK · ${SimpleDateFormat("d.M.yyyy HH:mm", Ui.DA).format(now)} · ${shownName { TripFiles.title(it) }}$target"
         val bmp = MapExport.capture(map, legendTv, caption, resources.displayMetrics.density)
         if (bmp == null) { toast("Kortet er ikke klar endnu"); return }
-        val shown = if (MapData.sessions == 1 && tripIndex in trips.indices) TripFiles.stamp(trips[tripIndex].name) else null
+        val shown = shown.singleOrNull()?.let { TripFiles.stamp(it.name) }
         Thread {
             val saved = MapExport.save(this, bmp, TripFiles.mapPictureName(SimpleDateFormat("yyyyMMdd_HHmmss", Ui.DA).format(now), shown))
             runOnUiThread {
@@ -547,7 +546,7 @@ class MainActivity : Activity() {
 
     /** Gemmer vandfaldet for den åbne tur, som det ses, i galleriet. Billedet hører til den tur, det viser. */
     private fun saveReplayPicture() {
-        val session = trips.getOrNull(tripIndex)?.let { TripFiles.stamp(it.name) }
+        val session = shown.singleOrNull()?.let { TripFiles.stamp(it.name) }
         val bmp = replayPane.picture()
         if (bmp == null || session == null) { toast("Vandfaldet er ikke klar endnu"); return }
         val now = SimpleDateFormat("yyyyMMdd_HHmmss", Ui.DA).format(Date())
@@ -574,17 +573,13 @@ class MainActivity : Activity() {
         TripShare.show(this, chosen, logs, today = chosen.size > 1)
     }
 
-    /** Bladrer én tur ad gangen: +1 = ældre, -1 = nyere. Forbi den nyeste vises kun den aktuelle tur. */
+    /** Bladrer én tur ad gangen fra den, der vises: +1 = ældre, -1 = nyere. Forbi den nyeste vises den aktuelle tur. */
     private fun stepTrip(dir: Int) {
-        trips = JsonlLog.list(this)
-        if (trips.isEmpty()) { toast("Der er ingen ture endnu"); return }
-        // den tur, der kører lige nu, vises i forvejen som "Aktuel tur" og springes over i listen
-        val live = Hub.logName?.takeIf { Hub.running }
-        var i = tripIndex + dir
-        while (i in trips.indices && live != null && trips[i].name.startsWith(live)) i += dir
-        if (i >= trips.size) { toast("Det er den ældste tur"); return }
-        tripIndex = if (i < 0) -1 else i
-        showOnMap(if (tripIndex < 0) emptyList() else listOf(trips[tripIndex]), tab)
+        val logs = JsonlLog.list(this)
+        if (logs.isEmpty()) { toast("Der er ingen ture endnu"); return }
+        val i = TripFiles.step(logs.map { it.name }, shown.singleOrNull()?.name, Hub.logName?.takeIf { Hub.running }, dir)
+        if (i >= logs.size) { toast("Det er den ældste tur"); return }
+        showOnMap(if (i < 0) emptyList() else listOf(logs[i]), tab)
     }
 
     /**
@@ -630,12 +625,12 @@ class MainActivity : Activity() {
             list.addView(line, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
         val back = if (tab == 2) 1 else tab
-        row("Aktuel tur", live, false, shown.isEmpty()) { tripIndex = -1; showOnMap(emptyList(), back) }
+        row("Aktuel tur", live, false, shown.isEmpty()) { showOnMap(emptyList(), back) }
         for ((i, e) in logs.withIndex()) {
             if (i == live) continue
             val session = TripFiles.stamp(e.name)
             row(TripFiles.title(e.name), i, session != null && shared.has(session, e.bytes), shown.any { it.name == e.name }) {
-                trips = logs; tripIndex = i; showOnMap(listOf(e), back)
+                showOnMap(listOf(e), back)
             }
         }
         fun chosen() = logs.filterIndexed { i, _ -> picked[i] }
@@ -643,9 +638,9 @@ class MainActivity : Activity() {
             .setTitle("Ture")
             .setView(ScrollView(this).apply { addView(list) })
             .setPositiveButton("Vis på kort") { _, _ ->
+                // den tur, der kører, ligger på kortet i forvejen og lægges ikke ind en gang til
                 val c = chosen()
-                if (c.isEmpty()) toast("Sæt flueben ved de ture, kortet skal vise")
-                else { trips = logs; tripIndex = if (c.size == 1) logs.indexOf(c[0]) else -1; showOnMap(c, 1) }
+                if (c.isEmpty()) toast("Sæt flueben ved de ture, kortet skal vise") else showOnMap(c.filter { logs.indexOf(it) != live }, 1)
             }
             .setNeutralButton("Del …") { _, _ ->
                 val c = chosen()
@@ -698,15 +693,19 @@ class MainActivity : Activity() {
     private fun showOnMap(entries: List<JsonlLog.Entry>, thenTab: Int = 1) {
         if (settingsView != null) closeSettings()
         shown = entries
-        if (entries.isEmpty()) { tripIndex = -1; waitingBox = null; MapData.clear(); replayPane.close(); showTab(thenTab); render(); return }
+        val request = ++showRequest
+        if (entries.isEmpty()) { waitingBox = null; MapData.clear(); replayPane.close(); showTab(thenTab); render(); return }
         val single = entries.singleOrNull()
         Thread {
-            val n = MapData.load(this, entries.map { it.uri })
+            val points = MapData.read(this, entries.map { it.uri })
             val replay = single?.let { Replay.parse(readLines(it.uri)) }
             // bølgeformen hører til turen, hvis den har det navn, loggen nævner
             val wave = replay?.iqFile?.let { name -> JsonlLog.list(this, JsonlLog.IQ_SUFFIX).firstOrNull { it.name == name } }
             runOnUiThread {
-                if (n == 0) toast("De valgte ture har ingen målinger med position")
+                // er der bedt om noget andet, mens filerne blev læst, hører det her ikke længere til det, der vises
+                if (request != showRequest) return@runOnUiThread
+                MapData.show(points, entries.size)
+                if (points.bursts.isEmpty()) toast("De valgte ture har ingen målinger med position")
                 val pts = MapData.bursts + MapData.silent
                 val lats = pts.mapNotNull { it.lat }; val lons = pts.mapNotNull { it.lon }
                 if (lats.isNotEmpty()) {
