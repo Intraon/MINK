@@ -73,7 +73,7 @@ Vandfaldet er genskabt fra turens log. Hvert udbrud står på sin frekvens og si
 
 En billig dongle viser gerne 30–60 kHz forkert ved 869 MHz, og fejlen flytter sig, mens donglen varmer op. Trafikken på din egen kanal ligger derimod præcist og er lige så bred som kanalen, så appen bruger den som lineal.
 
-Ligger de brede udbrud ved siden af det grønne felt, kommer en gul bjælke: "Donglen viser 14 kHz for lavt – tryk her for at rette". Et tryk retter PPM-korrektionen med det samme, og målet og de andre sendere flytter med. Bjælken kan komme et par gange, til donglen er varm. Korrektionen kan også skrives i hånden under ⚙.
+Ligger de brede udbrud ved siden af det grønne felt, kommer en gul bjælke: "Donglen viser 14 kHz for lavt – tryk her for at rette". Et tryk retter frekvensrettelsen (ppm) med det samme, og målet og de andre sendere flytter med. Bjælken kan komme et par gange, til donglen er varm. Korrektionen kan også skrives i hånden under ⚙.
 
 Lad donglen være tændt i 5–10 minutter, før du stoler på et frekvenstal.
 
@@ -139,16 +139,17 @@ Når du har valgt en app i delemenuen, og loggen var med, får turene mærket **
 
 | Afsnit | Indstilling |
 |---|---|
-| Din kanal | Kanalens frekvens og bredde. Vises som det grønne felt og bruges til at rette donglens frekvens |
-| Det der ledes efter | Båndet, der lyttes i (højst 880 kHz), signalets bredde, målets frekvens, tærsklen, korteste signal og frekvenser, der skal ignoreres |
-| Modtager | PPM-korrektion, gain, og om appen må skrue ned ved mætning |
-| Retningsantenne | Om retningen skal gemmes, og kamerafanen vises |
-| Lyd og skærm | Bip, lydstyrke, og om skærmen holdes tændt |
-| Bølgeform | Om IQ-udsnittet af hver måling gemmes |
-| Upload | En webhook, der får målingerne løbende, se nedenfor |
-| Om MINK | Version, opdatering, kildekode og licens |
+| Kanal og bånd | Din kanals frekvens og bredde, og båndet, der lyttes i. En tegning viser båndet og din kanal i forhold til de 880 kHz, modtageren ser ad gangen |
+| Målet | Målets frekvens og signalets bredde |
+| Modtager | Gain, om appen må skrue ned ved mætning, og frekvensrettelsen (ppm) |
+| Udstyr, lyd og skærm | Retningsantenne, bip, lydstyrke, og om skærmen holdes tændt |
+| Det, der gemmes og sendes | Om bølgeformen af hver måling gemmes, og en webhook, der får målingerne løbende, se nedenfor |
+| Finjustering | Tærsklen, korteste signal og frekvenser, der skal ignoreres. Foldet sammen, til du åbner den |
+| Om MINK | Version, opdatering, batteri-indstillinger, kildekode og licens |
 
-Ændrer du gain, PPM eller retningsantenne, mens der måles, gælder det med det samme. Resten gælder fra næste Start.
+Et mærke ved overskriften eller feltet siger, om en ændring gælder med det samme eller fra næste Start. Gain, frekvensrettelse og retningsantenne gælder med det samme, også mens der måles. **Gem** og **Annullér** ligger fast i bunden.
+
+Er båndet bredere end 880 kHz, står det under felterne med bredden i tal, og **Gem** er grå, til båndet passer. Knappen **Brug 880 kHz omkring din kanal** sætter det bredeste bånd, der kan lyttes på.
 
 Sæt båndet med luft omkring det, du leder efter. Driver målet hen mod kanten af det, appen søger i, siger en gul bjælke det.
 
