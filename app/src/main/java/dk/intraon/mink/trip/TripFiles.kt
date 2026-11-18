@@ -21,19 +21,12 @@ object TripFiles {
     /** Starten på den første tur efter [session] blandt [all], eller null hvis [session] er den nyeste. */
     fun nextAfter(session: String, all: Collection<String>): String? = all.filter { it > session }.minOrNull()
 
-    /** Hvor meget en deling tager med, fra mindst til mest. Tallene gemmes i indstillingerne. */
-    const val SHARE_LOG = 0
-    const val SHARE_WAVE = 1
-    const val SHARE_ALL = 2
-
-    /**
-     * De trin, en tur kan deles på: loggen alene, med bølgeform, hvis turen har én, og det hele. Det hele findes
-     * altid, fordi kortet over turen laves, når den deles.
-     */
-    fun shareLevels(hasWave: Boolean): List<Int> = listOfNotNull(SHARE_LOG, SHARE_WAVE.takeIf { hasWave }, SHARE_ALL)
-
-    /** Det trin, dialogen står på: det, der blev valgt sidst, eller det højeste under det, som turen har filer til. */
-    fun shareLevel(remembered: Int, levels: List<Int>): Int = levels.lastOrNull { it <= remembered } ?: SHARE_LOG
+    /** Det, en deling kan tage med. Valget gemmes i indstillingerne som summen af de valgte dele. */
+    const val PART_LOG = 1
+    const val PART_WAVE = 2
+    const val PART_PICTURES = 4
+    const val PART_MAP = 8
+    const val PART_ALL = PART_LOG or PART_WAVE or PART_PICTURES or PART_MAP
 
     /**
      * Navnet på et kortbillede taget [now] ("20261117_130000"). Viser kortet én tidligere tur, står dens tidsstempel
@@ -62,6 +55,18 @@ object TripFiles {
     fun title(name: String): String {
         val m = Regex("""(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})""").find(name) ?: return name
         return "${m.groupValues[3]}.${m.groupValues[2]}.${m.groupValues[1]} kl. ${m.groupValues[4]}.${m.groupValues[5]}"
+    }
+
+    /** "16.11 kl. 22.37": turens navn, hvor der er lidt plads. */
+    fun shortTitle(name: String): String {
+        val m = Regex("""\d{4}(\d{2})(\d{2})_(\d{2})(\d{2})""").find(name) ?: return name
+        return "${m.groupValues[2]}.${m.groupValues[1]} kl. ${m.groupValues[3]}.${m.groupValues[4]}"
+    }
+
+    /** "kl. 22.37": en tur fra i dag, nævnt blandt andre fra i dag. */
+    fun clock(name: String): String {
+        val m = Regex("""\d{8}_(\d{2})(\d{2})""").find(name) ?: return name
+        return "kl. ${m.groupValues[1]}.${m.groupValues[2]}"
     }
 
     /** "48 kB" eller "3,2 MB". */

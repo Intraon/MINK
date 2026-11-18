@@ -25,10 +25,10 @@ import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.WindowManager
-import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import dk.intraon.mink.map.MapExport
@@ -42,6 +42,7 @@ import dk.intraon.mink.measure.MeasureService
 import dk.intraon.mink.radio.Calibrate
 import dk.intraon.mink.replay.Replay
 import dk.intraon.mink.replay.ReplayPane
+import dk.intraon.mink.trip.Export
 import dk.intraon.mink.trip.JsonlLog
 import dk.intraon.mink.trip.TripFiles
 import dk.intraon.mink.trip.TripShare
@@ -110,11 +111,13 @@ class MainActivity : Activity() {
     private lateinit var pointsLayer: PointsOverlay
     private var settingsView: View? = null
     private lateinit var tripTv: TextView
+    private lateinit var tripBar: View
     private var follow = true
-    /** Ture, der kan bladres i på kortet (nyeste først), og hvilken der vises: -1 = kun den aktuelle tur. */
+    /** Ture, der kan bladres i (nyeste først), og hvilken der vises: -1 = den aktuelle tur eller flere ture på én gang. */
     private var trips: List<JsonlLog.Entry> = emptyList()
     private var tripIndex = -1
-    private var tripsShown = 0
+    /** De tidligere ture, kortet viser. Tom = kun den aktuelle tur. */
+    private var shown: List<JsonlLog.Entry> = emptyList()
     private lateinit var replayPane: ReplayPane
     private var driverOk = true
     private var dongle: Boolean? = null
@@ -173,6 +176,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         Hub.unlisten(listener)
+        Export.forget(this)
         map.onDetach()
         super.onDestroy()
     }
@@ -201,9 +205,9 @@ class MainActivity : Activity() {
         textSize = sp; setTextColor(color); if (bold) typeface = Typeface.DEFAULT_BOLD
     }
 
-    /** Et tegn med en lille forklaring under, til knapperne nederst. */
-    private fun captioned(sign: String, caption: String): CharSequence = SpannableStringBuilder("$sign\n$caption").apply {
-        setSpan(android.text.style.RelativeSizeSpan(0.55f), sign.length + 1, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    /** Et tegn eller et ord med en lille forklaring under. [small] er forklaringens størrelse i forhold til tegnet. */
+    private fun captioned(sign: String, caption: String, small: Float = 0.55f): CharSequence = SpannableStringBuilder("$sign\n$caption").apply {
+        setSpan(android.text.style.RelativeSizeSpan(small), sign.length + 1, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         setSpan(ForegroundColorSpan(Ui.DIM), sign.length + 1, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
     }
 
@@ -288,17 +292,6 @@ class MainActivity : Activity() {
             render()
         }
         mapBox.addView(heatBtn, FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP or Gravity.END).apply { setMargins(dp(8), dp(64), dp(8), dp(8)) })
-        // bladr i tidligere ture: ◀ ældre, ▶ nyere; tryk på navnet for at vælge flere ad gangen
-        val tripBar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        tripBar.addView(button("◀", Ui.BUTTON) { stepTrip(+1) }, LinearLayout.LayoutParams(dp(44), dp(44)))
-        tripTv = tv(14f, Ui.TEXT, true).apply {
-            text = "Aktuel tur"; gravity = Gravity.CENTER; setPadding(dp(10), 0, dp(10), 0)
-            background = GradientDrawable().apply { setColor(0xE6202124.toInt()); cornerRadius = dp(10).toFloat() }
-            setOnClickListener { tripsDialog() }
-        }
-        tripBar.addView(tripTv, LinearLayout.LayoutParams(WRAP_CONTENT, dp(44)).apply { setMargins(dp(4), 0, dp(4), 0) })
-        tripBar.addView(button("▶", Ui.BUTTON) { stepTrip(-1) }, LinearLayout.LayoutParams(dp(44), dp(44)))
-        mapBox.addView(tripBar, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.TOP or Gravity.START).apply { setMargins(dp(8), dp(8), dp(8), dp(8)) })
         legendTv = tv(12f, Ui.TEXT).apply { setBackgroundColor(0xCC0E0F12.toInt()); setPadding(dp(6), dp(3), dp(6), dp(3)) }
         mapBox.addView(legendTv, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply { setMargins(dp(6), dp(6), dp(6), dp(6)) })
         // faner: vandfald (se båndet og vælg mål) og kort (hvor er der målt)
@@ -322,9 +315,22 @@ class MainActivity : Activity() {
         mainBox.addView(replayPane, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         cameraPane = CameraPane(this)
         mainBox.addView(cameraPane, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        // Nederst i indholdet, samme sted på Vandfald og Kort: hvilken tur der vises, og et billede af det, der ses.
+        // ◀ er ældre, ▶ er nyere, og et tryk på navnet åbner listen over ture.
+        val trip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        trip.addView(button("◀", Ui.BUTTON) { stepTrip(+1) }.apply { contentDescription = "Ældre tur" }, LinearLayout.LayoutParams(dp(44), dp(44)))
+        tripTv = tv(14f, Ui.TEXT, true).apply {
+            text = "Aktuel tur"; gravity = Gravity.CENTER; setPadding(dp(10), 0, dp(10), 0); maxLines = 1
+            background = GradientDrawable().apply { setColor(0xE6202124.toInt()); cornerRadius = dp(10).toFloat() }
+            setOnClickListener { tripsDialog() }
+        }
+        trip.addView(tripTv, LinearLayout.LayoutParams(WRAP_CONTENT, dp(44)).apply { setMargins(dp(4), 0, dp(4), 0) })
+        trip.addView(button("▶", Ui.BUTTON) { stepTrip(-1) }.apply { contentDescription = "Nyere tur" }, LinearLayout.LayoutParams(dp(44), dp(44)))
+        tripBar = trip
+        mainBox.addView(trip, FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply { setMargins(dp(8), dp(8), dp(8), dp(34)) })
         // Billede: i vandfaldet de seneste 30 sekunder som en figur; på kortet og i en tidligere turs vandfald det, der ses
         figureBtn = button("Billede", 0xE6202124.toInt()) { if (tab == 1) saveMapPicture() else if (replayPane.active) saveReplayPicture() else shareFigure() }.apply { textSize = 13f; setPadding(dp(12), 0, dp(12), 0) }
-        mainBox.addView(figureBtn, FrameLayout.LayoutParams(WRAP_CONTENT, dp(36), Gravity.BOTTOM or Gravity.END).apply { setMargins(dp(8), dp(8), dp(8), dp(34)) })
+        mainBox.addView(figureBtn, FrameLayout.LayoutParams(WRAP_CONTENT, dp(44), Gravity.BOTTOM or Gravity.END).apply { setMargins(dp(8), dp(8), dp(8), dp(34)) })
         col.addView(mainBox, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
         showTab(0)
 
@@ -339,10 +345,10 @@ class MainActivity : Activity() {
         }, 1f)
         add(button(captioned("−", "Gain"), Ui.BUTTON) { MeasureService.send(this, MeasureService.ACTION_GAIN_DOWN) }, 1f)
         add(button(captioned("+", "Gain"), Ui.BUTTON) { MeasureService.send(this, MeasureService.ACTION_GAIN_UP) }, 1f)
-        // Del: seneste tur til delemenuen; langt tryk åbner listen over ture
-        add(button(captioned("Del", "turen"), Ui.BUTTON) { exportLatest() }.apply {
+        // Del: de ture, der vises, eller dagens udelte; langt tryk åbner listen over ture
+        add(button(captioned("Del", "turen"), Ui.BUTTON) { shareTrips() }.apply {
             textSize = 16f; setTextColor(Ui.ACCENT)
-            setOnLongClickListener { sessionsDialog(); true }
+            setOnLongClickListener { tripsDialog(); true }
         }, 1.5f)
         add(button(captioned("⚙", "Indstil"), Ui.BUTTON) { openSettings() }, 1f)
         col.addView(bar, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
@@ -355,6 +361,8 @@ class MainActivity : Activity() {
         waterfall.visibility = if (which == 0 && !replay) View.VISIBLE else View.GONE
         replayPane.visibility = if (which == 0 && replay) View.VISIBLE else View.GONE
         figureBtn.visibility = if (which == 0 || which == 1) View.VISIBLE else View.GONE
+        figureBtn.text = captioned("Billede", if (which == 1) "af kortet" else "af vandfaldet", 0.85f)
+        tripBar.visibility = figureBtn.visibility
         mapBoxView.visibility = if (which == 1) View.VISIBLE else View.GONE
         cameraPane.visibility = if (which == 2) View.VISIBLE else View.GONE
         if (which == 2) cameraPane.open() else cameraPane.close()
@@ -521,7 +529,7 @@ class MainActivity : Activity() {
     private fun saveMapPicture() {
         val now = Date()
         val target = Hub.targetHz?.let { " · mål ${Ui.mhz(it)} MHz" } ?: ""
-        val caption = "MINK · ${SimpleDateFormat("d.M.yyyy HH:mm", Ui.DA).format(now)} · ${tripTv.text}$target"
+        val caption = "MINK · ${SimpleDateFormat("d.M.yyyy HH:mm", Ui.DA).format(now)} · ${shownName { TripFiles.title(it) }}$target"
         val bmp = MapExport.capture(map, legendTv, caption, resources.displayMetrics.density)
         if (bmp == null) { toast("Kortet er ikke klar endnu"); return }
         val shown = if (MapData.sessions == 1 && tripIndex in trips.indices) TripFiles.stamp(trips[tripIndex].name) else null
@@ -547,35 +555,22 @@ class MainActivity : Activity() {
         }.start()
     }
 
-    private fun exportLatest() {
+    /**
+     * Del: viser kortet tidligere ture, er det dem. Ellers er det dagens ture, som ikke er delt, og er de alle delt,
+     * den nyeste.
+     */
+    private fun shareTrips() {
         val logs = JsonlLog.list(this)
         if (logs.isEmpty()) { toast("Der er ingen ture at sende endnu"); return }
-        TripShare.show(this, listOf(logs[0]), logs, offerOlder = true)
+        val open = logs.filter { l -> shown.any { it.name == l.name } }
+        if (open.isNotEmpty()) { TripShare.show(this, open, logs); return }
+        val today = SimpleDateFormat("yyyyMMdd", Ui.DA).format(Date())
+        val suggested = settings.sharedTrips.suggested(logs.mapNotNull { e -> TripFiles.stamp(e.name)?.let { it to e.bytes } }, today)
+        val chosen = logs.filter { TripFiles.stamp(it.name) in suggested }.ifEmpty { listOf(logs[0]) }
+        TripShare.show(this, chosen, logs, today = chosen.size > 1)
     }
 
-    /** Vælg en eller flere tidligere ture: læg dem på kortet, eller del dem. */
-    fun sessionsDialog() {
-        val logs = JsonlLog.list(this)
-        if (logs.isEmpty()) { toast("Der er ingen ture endnu"); return }
-        val names = logs.map { e -> "${TripFiles.title(e.name)} · ${max(1, e.bytes / 1024)} KB" }.toTypedArray()
-        val picked = BooleanArray(logs.size).also { it[0] = true }
-        fun chosen() = logs.filterIndexed { i, _ -> picked[i] }.map { it.uri }
-        AlertDialog.Builder(this)
-            .setTitle("Tidligere ture")
-            .setMultiChoiceItems(names, picked) { _, i, on -> picked[i] = on }
-            .setPositiveButton("Vis på kort") { _, _ ->
-                trips = logs
-                tripIndex = if (picked.count { it } == 1) picked.indexOfFirst { it } else -1
-                showOnMap(chosen())
-            }
-            .setNeutralButton("Del …") { _, _ ->
-                if (chosen().isEmpty()) toast("Vælg mindst én tur")
-                else TripShare.show(this, logs.filterIndexed { i, _ -> picked[i] }, logs, offerOlder = false)
-            }
-            .setNegativeButton("Luk", null).show()
-    }
-
-    /** Bladrer én tur ad gangen på kortet: +1 = ældre, -1 = nyere. Forbi den nyeste vises kun den aktuelle tur. */
+    /** Bladrer én tur ad gangen: +1 = ældre, -1 = nyere. Forbi den nyeste vises kun den aktuelle tur. */
     private fun stepTrip(dir: Int) {
         trips = JsonlLog.list(this)
         if (trips.isEmpty()) { toast("Der er ingen ture endnu"); return }
@@ -585,35 +580,95 @@ class MainActivity : Activity() {
         while (i in trips.indices && live != null && trips[i].name.startsWith(live)) i += dir
         if (i >= trips.size) { toast("Det er den ældste tur"); return }
         tripIndex = if (i < 0) -1 else i
-        showOnMap(if (tripIndex < 0) emptyList() else listOf(trips[tripIndex].uri))
+        showOnMap(if (tripIndex < 0) emptyList() else listOf(trips[tripIndex]), tab)
     }
 
     /**
-     * Listen over ture med længde, antal målinger og stærkeste niveau. Et tryk åbner turen: kortet viser den, og
-     * fanen Vandfald viser dens vandfald, genskabt fra loggen.
+     * Listen over ture: øverst den aktuelle, derunder de gemte med længde, antal målinger og stærkeste niveau, og
+     * mærket "delt" på dem, der er delt. Et tryk på en tur åbner den: kortet viser den, og fanen Vandfald viser dens
+     * vandfald, genskabt fra loggen. Fluebenene vælger flere ture, som kan lægges på kortet eller deles. [ticked] er
+     * navnene på de logge, der er valgt fra start.
      */
-    fun tripsDialog() {
+    fun tripsDialog(ticked: Collection<String> = emptyList()) {
         val logs = JsonlLog.list(this)
         if (logs.isEmpty()) { toast("Der er ingen ture endnu"); return }
-        val rows = logs.map { TripFiles.title(it.name) + "\nlæser …" }.toMutableList()
-        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, rows)
-        val dlg = AlertDialog.Builder(this)
+        val shared = settings.sharedTrips
+        val live = Hub.logName?.takeIf { Hub.running }?.let { name -> logs.indexOfFirst { it.name.startsWith(name) } } ?: -1
+        val picked = BooleanArray(logs.size) { logs[it].name in ticked }
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(4), dp(8), 0) }
+        val stats = arrayOfNulls<TextView>(logs.size)
+        var dlg: AlertDialog? = null
+        fun shareLabel() {
+            val n = picked.count { it }
+            dlg?.getButton(AlertDialog.BUTTON_NEUTRAL)?.text = when (n) { 0 -> "Del …"; 1 -> "Del 1 tur …"; else -> "Del $n ture …" }
+        }
+        /**
+         * Én række: navn og tal til venstre, som åbner turen, og et flueben til højre for loggen [log] (-1 = rækken
+         * har ingen log). [current] er den, skærmen viser nu.
+         */
+        fun row(name: String, log: Int, wasShared: Boolean, current: Boolean, open: () -> Unit) {
+            val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; minimumHeight = dp(60) }
+            val info = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(8), 0, dp(8)); setOnClickListener { dlg?.dismiss(); open() } }
+            val title = tv(16f, if (current) Ui.ACCENT else Ui.TEXT)
+            title.text = if (!wasShared) name else SpannableStringBuilder("$name  delt").apply {
+                setSpan(android.text.style.RelativeSizeSpan(0.75f), name.length, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                setSpan(ForegroundColorSpan(Ui.GREEN), name.length, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            val sub = tv(13f, Ui.DIM)
+            sub.text = if (log < 0) "ingen måling i gang" else if (log == live) "måler nu" else "læser …"
+            if (log >= 0) stats[log] = sub
+            info.addView(title); info.addView(sub)
+            line.addView(info, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+            if (log >= 0) line.addView(android.widget.CheckBox(this).apply {
+                isChecked = picked[log]; contentDescription = "Vælg $name"
+                setOnCheckedChangeListener { _, on -> picked[log] = on; shareLabel() }
+            }, LinearLayout.LayoutParams(dp(48), dp(48)))
+            list.addView(line, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        }
+        val back = if (tab == 2) 1 else tab
+        row("Aktuel tur", live, false, shown.isEmpty()) { tripIndex = -1; showOnMap(emptyList(), back) }
+        for ((i, e) in logs.withIndex()) {
+            if (i == live) continue
+            val session = TripFiles.stamp(e.name)
+            row(TripFiles.title(e.name), i, session != null && shared.has(session, e.bytes), shown.any { it.name == e.name }) {
+                trips = logs; tripIndex = i; showOnMap(listOf(e), back)
+            }
+        }
+        fun chosen() = logs.filterIndexed { i, _ -> picked[i] }
+        val made = AlertDialog.Builder(this)
             .setTitle("Ture")
-            .setAdapter(adapter) { _, i -> trips = logs; tripIndex = i; showOnMap(listOf(logs[i].uri), 0) }
-            .setNeutralButton("Vælg flere …") { _, _ -> sessionsDialog() }
+            .setView(ScrollView(this).apply { addView(list) })
+            .setPositiveButton("Vis på kort") { _, _ ->
+                val c = chosen()
+                if (c.isEmpty()) toast("Sæt flueben ved de ture, kortet skal vise")
+                else { trips = logs; tripIndex = if (c.size == 1) logs.indexOf(c[0]) else -1; showOnMap(c, 1) }
+            }
+            .setNeutralButton("Del …") { _, _ ->
+                val c = chosen()
+                if (c.isEmpty()) toast("Sæt flueben ved de ture, der skal deles") else TripShare.show(this, c, logs)
+            }
             .setNegativeButton("Luk", null).show()
+        dlg = made
+        shareLabel()
         Thread {
             for ((i, e) in logs.withIndex()) {
-                if (!dlg.isShowing) break
+                if (!made.isShowing) break
                 val r = Replay.parse(readLines(e.uri))
-                val text = TripFiles.title(e.name) + "\n" + if (r == null) "tom" else listOfNotNull(
+                val numbers = (if (i == live) "måler nu · " else "") + if (r == null) "tom" else listOfNotNull(
                     ((r.endMs - r.startMs) / 60_000).let { if (it < 1) "under 1 min" else "$it min" },
                     if (r.target.size == 1) "1 måling" else "${r.target.size} målinger",
                     r.strongest?.let { "stærkest ${Ui.f1(it)} dB" },
                 ).joinToString(" · ")
-                runOnUiThread { rows[i] = text; adapter.notifyDataSetChanged() }
+                runOnUiThread { stats[i]?.text = numbers }
             }
         }.start()
+    }
+
+    /** Navnet på det, kortet viser: "Aktuel tur", turens navn dannet med [title], eller antallet af ture. */
+    private fun shownName(title: (String) -> String): String = when {
+        shown.isEmpty() -> "Aktuel tur"
+        shown.size == 1 -> title(shown[0].name)
+        else -> "${shown.size} ture"
     }
 
     /** En logfils linjer (kald fra en baggrundstråd). Tom, hvis filen ikke kan læses. */
@@ -624,13 +679,13 @@ class MainActivity : Activity() {
      * Lægger de valgte ture ind på kortet (ingen valgt = fjern dem igen), zoomer, så de kan ses, og viser fanen
      * [thenTab]. Er der valgt netop én tur, åbnes også dens vandfald; ellers lukkes det.
      */
-    private fun showOnMap(uris: List<Uri>, thenTab: Int = 1) {
+    private fun showOnMap(entries: List<JsonlLog.Entry>, thenTab: Int = 1) {
         if (settingsView != null) closeSettings()
-        tripsShown = uris.size
-        if (uris.isEmpty()) { tripIndex = -1; MapData.clear(); replayPane.close(); showTab(thenTab); render(); return }
-        val single = if (uris.size == 1) trips.getOrNull(tripIndex) else null
+        shown = entries
+        if (entries.isEmpty()) { tripIndex = -1; MapData.clear(); replayPane.close(); showTab(thenTab); render(); return }
+        val single = entries.singleOrNull()
         Thread {
-            val n = MapData.load(this, uris)
+            val n = MapData.load(this, entries.map { it.uri })
             val replay = single?.let { Replay.parse(readLines(it.uri)) }
             // bølgeformen hører til turen, hvis den har det navn, loggen nævner
             val wave = replay?.iqFile?.let { name -> JsonlLog.list(this, JsonlLog.IQ_SUFFIX).firstOrNull { it.name == name } }
@@ -836,11 +891,10 @@ class MainActivity : Activity() {
             range == null -> "ingen målinger endnu"
             else -> "${trips}blå ${Ui.f1(range.first)} → rød ${Ui.f1(range.second)} dB · ${Hub.bursts.size + MapData.bursts.size} målinger · ${Hub.silent.size + MapData.silent.size} stille"
         }
-        tripTv.text = when {
-            tripsShown == 0 -> "Aktuel tur"
-            tripsShown == 1 && tripIndex in this.trips.indices -> TripFiles.title(this.trips[tripIndex].name)
-            else -> "$tripsShown ture"
-        }
+        // turens navn er fremhævet, når det, der vises, ikke er den aktuelle tur
+        tripTv.text = shownName { TripFiles.shortTitle(it) }
+        tripTv.setTextColor(if (shown.isEmpty()) Ui.TEXT else Ui.BG)
+        (tripTv.background as GradientDrawable).setColor(if (shown.isEmpty()) 0xE6202124.toInt() else Ui.ACCENT)
         if (follow && gpsOk) map.controller.setCenter(GeoPoint(loc!!.latitude, loc.longitude))
         map.invalidate()
         graph.invalidate()

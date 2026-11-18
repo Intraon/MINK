@@ -1,18 +1,29 @@
 package dk.intraon.mink.trip
 
 import android.app.Activity
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.IntentSender
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 import dk.intraon.mink.waterfall.FigureExport
 
 /** Del logfiler eller et billede via Androids delemenu. */
 object Export {
-    /** Åbner Androids delemenu med filerne. Ingen fortrykt tekst: modtageren og budskabet er brugerens. */
-    fun share(a: Activity, uris: List<Uri>, mime: String = "text/plain", title: String = "Del målinger") {
+    /** Den modtager, der venter på besked om et valg i delemenuen, og den skærm, den er meldt til hos. */
+    private var waiting: Pair<Activity, BroadcastReceiver>? = null
+
+    /**
+     * Åbner Androids delemenu med filerne. Ingen fortrykt tekst: modtageren og budskabet er brugerens. [picked]
+     * kaldes på hovedtråden, når brugeren har valgt en app i menuen; Android fortæller ikke, om der derefter blev sendt.
+     */
+    fun share(a: Activity, uris: List<Uri>, mime: String = "text/plain", title: String = "Del målinger", picked: (() -> Unit)? = null) {
         if (uris.isEmpty()) return
         val i = if (uris.size == 1) {
             Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris[0])
@@ -24,7 +35,36 @@ object Export {
         val clip = ClipData.newRawUri("MINK", uris[0])
         for (u in uris.drop(1)) clip.addItem(ClipData.Item(u))
         i.clipData = clip
-        a.startActivity(Intent.createChooser(i, title))
+        val sender = picked?.let { whenPicked(a, it) }
+        a.startActivity(if (sender == null) Intent.createChooser(i, title) else Intent.createChooser(i, title, sender))
+        // kan appen ikke få besked om valget, regnes filerne som delt, når menuen åbner
+        if (sender == null) picked?.invoke()
+    }
+
+    /**
+     * Det, delemenuen skal sende, når brugeren vælger en app: en besked til denne app alene, som kalder [picked] én
+     * gang. Kun det seneste valg ventes der på. Null, hvis Android ikke vil tage imod den.
+     */
+    private fun whenPicked(a: Activity, picked: () -> Unit): IntentSender? = try {
+        forget(a)
+        val action = a.packageName + ".DELT"
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) { forget(a); picked() }
+        }
+        if (Build.VERSION.SDK_INT >= 33) a.registerReceiver(receiver, IntentFilter(action), Context.RECEIVER_NOT_EXPORTED)
+        else a.registerReceiver(receiver, IntentFilter(action))
+        waiting = a to receiver
+        PendingIntent.getBroadcast(a, 0, Intent(action).setPackage(a.packageName), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE).intentSender
+    } catch (_: Exception) {
+        forget(a); null
+    }
+
+    /** Holder op med at vente på et valg i delemenuen. Kaldes, når skærmen [a] lukkes. */
+    fun forget(a: Activity) {
+        val (owner, receiver) = waiting ?: return
+        if (owner !== a) return
+        waiting = null
+        try { a.unregisterReceiver(receiver) } catch (_: Exception) {}
     }
 
     /** Appens egne billeder i galleriet (Pictures/MINK): målebilleder og pejlingsfotos. */

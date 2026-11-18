@@ -24,7 +24,7 @@ Knapperne nederst:
 | **Start / Stop** | Starter og stopper en tur |
 | **⚑ Mærke** | Sætter et mærke i loggen og på kortet dér, hvor du står. Du vælger, om stedet er en mulig kilde, en fundet kilde eller et almindeligt, nummereret mærke. Mærkerne står også på kortbillederne |
 | **− og + Gain** | Flytter donglens forstærkning ét trin, med det samme |
-| **Del** | Sender turens filer videre, se [Del](#del) |
+| **Del** | Sender den tur, du ser, eller dagens udelte ture videre, se [Del](#del) |
 | **⚙ Indstil** | Kanal, bånd og resten af indstillingerne |
 
 ## Vandfaldet og målet
@@ -51,11 +51,14 @@ Går du samme vej to gange, ligger den stærkeste måling øverst. Din krop, en 
 
 - **▦** skifter til varmekortet: målingerne samles i felter, hvis størrelse følger zoom, fra 25 m og op. Det stærkeste felt får en hvid ramme med sit niveau. Der gættes ikke mellem felterne; hvor du ikke har været, er kortet tomt.
 - **◉** følger din position.
-- **◀ og ▶** bladrer gennem tidligere ture. Tryk på turens navn imellem dem for at få listen over ture.
+
+Nederst i vandfaldet og på kortet står, hvilken tur du ser: **◀ Aktuel tur ▶**. Pilene bladrer gennem tidligere ture, og et tryk på navnet åbner listen over ture. Navnet er blåt, når du ser en tidligere tur. Tallet, pilen og grafen øverst på skærmen viser altid den måling, der kører nu.
 
 ## Se en tur igen
 
-Listen **Ture** (tryk på turens navn på kortet, eller under ⚙) viser hver tur med dato, længde, antal målinger og det stærkeste niveau. Tryk på en tur for at åbne den: kortet viser turen, og fanen **Vandfald** viser turens vandfald i stedet for det levende. **Vælg flere …** lægger flere ture på kortet på én gang eller deler dem.
+Listen **Ture** (tryk på turens navn nederst i vandfaldet eller på kortet) viser hver tur med dato, længde, antal målinger og det stærkeste niveau. Øverst står **Aktuel tur**, som fører tilbage til den måling, der kører. Tryk på en tur for at åbne den: kortet viser turen, og fanen **Vandfald** viser turens vandfald i stedet for det levende.
+
+Sæt flueben ved flere ture for at lægge dem på kortet på én gang (**Vis på kort**) eller dele dem (**Del …**). En tur, du har delt, har mærket **delt**. Mærket ligger på telefonen og ikke i loggen. Det sættes, når du har valgt en app i Androids delemenu, og det forsvinder igen, hvis turen er blevet længere siden.
 
 Vandfaldet er genskabt fra turens log. Hvert udbrud står på sin frekvens og sit klokkeslæt med sin bredde og varighed, for alle de sendere, der blev hørt. Støjen mellem udbruddene blev ikke gemt, så dér er vandfaldet tomt.
 
@@ -98,15 +101,15 @@ Det skal du vide:
 
 ## Målebilledet
 
-Knappen **Billede** i vandfaldet gemmer en figur af de seneste 30 sekunder i galleriet: vandfaldet med tiden vandret, din kanal markeret, og nedenunder styrken over tid for målet (eller for kanalen, hvis intet mål er valgt). Stiplede streger viser, hvor hvert udbrud begynder, så man ser, hvor tit det kommer.
+Knappen **Billede** står nederst til højre og siger, hvad den gemmer. I vandfaldet gemmer den en figur af de seneste 30 sekunder i galleriet: vandfaldet med tiden vandret, din kanal markeret, og nedenunder styrken over tid for målet (eller for kanalen, hvis intet mål er valgt). Stiplede streger viser, hvor hvert udbrud begynder, så man ser, hvor tit det kommer.
 
 På fanen **Kort** gemmer samme knap kortet, som du ser det: udsnittet, linjen eller varmekortet, pejlingerne og farveforklaringen, med dato, tur og mål skrevet under. Zoom og flyt kortet, til det viser det, du vil have med, før du trykker. Billedet følger med, når turen deles; bladrer du til en tidligere tur og tager billedet dér, hører det til den tur.
 
-Vælger du **Det hele**, når du deler, laver appen desuden selv et kort over hele turen: udsnittet rummer alle steder, du har målt, og turen er tegnet som den farvede linje med mærker og pejlinger. Kortfliserne hentes fra nettet, så uden forbindelse kommer turen med på en tom baggrund. Der er ét sådant kort pr. tur; deler du turen igen, erstattes det.
+Sætter du flueben ved **Et billede af kortet over turen**, når du deler, laver appen desuden selv et kort over hele turen: udsnittet rummer alle steder, du har målt, og turen er tegnet som den farvede linje med mærker og pejlinger. Kortfliserne hentes fra nettet, så uden forbindelse kommer turen med på en tom baggrund. Der er ét sådant kort pr. tur; deler du turen igen, erstattes det.
 
 ## Kortfilen
 
-Sætter du flueben ved **Læg et kort ved, der kan åbnes i en browser**, når du deler, laver appen én HTML-fil med de valgte ture. Den åbnes i en browser på en pc eller en telefon og kan sendes som enhver anden fil.
+Sætter du flueben ved **Et kort, der kan åbnes i en browser**, når du deler, laver appen én HTML-fil med de valgte ture. Den åbnes i en browser på en pc eller en telefon og kan sendes som enhver anden fil.
 
 - Sporet er en streg farvet efter målets niveau. Hvor ruten går samme vej flere gange, ligger den kraftigste måling øverst, og stille stykker er grå. Et tryk på stregen viser tid, niveau og sted.
 - Hver pejling har en mærkat med nummer og retning. Et tryk åbner pejlingen med dens foto. Retningen er midten af den brede top fra drejningen på stedet, og stregen er lang, når retningen er tydelig, og prikket, når den ikke er.
@@ -118,9 +121,19 @@ Filen hedder `MINK_kort_<tur>.html` og ligger i `Download/mink/`. Deler du de sa
 
 ## Del
 
-Et tryk på **Del** åbner en dialog for den seneste tur. Du vælger, hvor meget der skal med: kun loggen, loggen og bølgeformen, eller det hele med et kort over turen og turens billeder. Dialogen viser, hvor meget hvert valg fylder. **Pak som én zip-fil** samler det valgte i én fil. Derefter åbner Androids delemenu. Appen siger, hvad den pakker, og hvis en fil ikke kan læses, nævner den filen og pakker resten. Appen skriver ingen tekst for dig, og valgene huskes til næste gang.
+Et tryk på **Del** åbner en dialog. Ser du en tidligere tur, er det den, der deles. Ser du den aktuelle tur, er det alle ture fra i dag, som du ikke har delt endnu, og er de alle delt, er det den nyeste. Dialogen siger, hvilke ture det er, og **Flere ture …** åbner listen, hvis du vil vælge andre.
 
-**Tidligere ture** i samme dialog, eller et langt tryk på Del, lader dig vælge en eller flere ældre ture, vise dem på kortet eller dele dem.
+Du sætter flueben ved det, der skal med:
+
+- **Loggen**
+- **Bølgeformen**, hvis turen har en
+- **Billederne fra turen**: målebilleder, kortbilleder og pejlingsfotos
+- **Et billede af kortet over turen**, som appen laver ved delingen
+- **Et kort, der kan åbnes i en browser**, se [Kortfilen](#kortfilen)
+
+Dialogen viser, hvor meget filerne fylder. **Pak som én zip-fil** samler det valgte i én fil. Derefter åbner Androids delemenu. Appen siger, hvad den pakker, og hvis en fil ikke kan læses, nævner den filen og pakker resten. Appen skriver ingen tekst for dig, og valgene huskes til næste gang.
+
+Når du har valgt en app i delemenuen, og loggen var med, får turene mærket **delt** i listen over ture.
 
 ## Indstillinger
 

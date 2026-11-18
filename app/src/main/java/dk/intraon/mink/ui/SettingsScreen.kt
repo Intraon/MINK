@@ -137,8 +137,7 @@ class SettingsScreen(private val a: MainActivity, private val s: Settings, priva
             }.start()
         }
 
-        heading("Ture")
-        action("Ture – se en tur igen, eller del", Ui.BUTTON) { a.tripsDialog() }
+        heading("Måling i baggrunden")
         action("Batteri-indstillinger for appen", Ui.BUTTON) { a.openAppSettings() }
 
         action("Gem", Ui.GREEN) {

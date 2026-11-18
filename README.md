@@ -42,7 +42,7 @@ Baggrunden står i artiklen [MINK finder forstyrrelser på en mesh-kanal](https:
 - **Donglens frekvensfejl** rettes med ét tryk ud fra trafikken på din egen kanal.
 - **Retningsantenne**: kompasretning på hver måling, kameravisning med farvebånd langs horisonten, og pejlinger som streger på kortet.
 - **Målebillede**: en figur af de seneste 30 sekunder til at dokumentere en forstyrrelse.
-- **Del** log, bølgeform og billeder fra en tur, enkeltvis eller som én zip-fil.
+- **Del** log, bølgeform, billeder og kort fra en eller flere ture, enkeltvis eller som én zip-fil. Appen husker, hvilke ture der er delt.
 
 Bredbåndet trafik som LoRa fra MeshCore, Meshtastic og LoRaWAN sorteres fra; MINK leder efter det smalle, der ikke hører hjemme.
 
