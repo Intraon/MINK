@@ -85,6 +85,13 @@ object Hub {
     @Volatile var targetHz: Double? = null
     /** Brugerens egen kanal (midte og bredde i Hz); 0 = ingen. Sættes fra indstillingerne. */
     @Volatile var channelHz = 0.0
+    /**
+     * Hvor stor en del af det seneste minut din kanal var optaget af de sendere, der høres (0–1), og hvor mange
+     * sendere det var. Null, før der er lyttet længe nok, uden en kanal, eller mens kanalen ikke er i det bånd,
+     * der lyttes på.
+     */
+    @Volatile var channelBusy: Double? = null
+    @Volatile var channelSenders = 0
     @Volatile var channelBwHz = 0.0
     /** [Scope.seq], da PPM-korrektionen sidst blev ændret: ældre rækker i vandfaldet ligger forskudt. */
     @Volatile var ppmSeq = 0L
@@ -142,6 +149,7 @@ object Hub {
         sessionStart = System.currentTimeMillis()
         sources = emptyList()
         targetAtEdge = false
+        channelBusy = null; channelSenders = 0
         bandLoHz = 0.0; bandHiHz = 0.0; homeLoHz = 0.0; homeHiHz = 0.0; targetHeard = true
         ppmSeq = 0
     }

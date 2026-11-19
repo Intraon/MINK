@@ -85,6 +85,7 @@ Skrives hvert 10. sekund.
 | `bursts` | Målinger i perioden, alle kilder |
 | `tb` | Målinger fra målet. `0` er et stille punkt. `null`, hvis intet mål var valgt, det blev valgt midt i perioden, eller målet ikke kunne høres i hele perioden, fordi båndet var flyttet væk fra det (se `away` og posten `band`) |
 | `away` | `true`, når målet lå uden for det bånd, der blev lyttet på. Feltet mangler ellers |
+| `busy` | Hvor mange procent af det seneste minut (eller den tid, der er lyttet, hvis den er kortere) mindst én af de hørte sendere sendte inden for din kanal (`chan` ± `chan_bw`/2 i `meta`). Mangler uden en kanal, de første 20 sekunder, og når kanalen ikke ligger i det bånd, der lyttes på |
 | `wide` | Blokke med kraftig, bredbåndet energi (fx LoRa) |
 | `maxsnr` | Højeste dB over støjen i perioden, også under tærsklen |
 | `frames` | Antal blokke i perioden |

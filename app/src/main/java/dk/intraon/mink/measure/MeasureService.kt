@@ -29,6 +29,7 @@ import dk.intraon.mink.direction.Rose
 import dk.intraon.mink.dsp.BurstDetector
 import dk.intraon.mink.dsp.IqRing
 import dk.intraon.mink.radio.GainControl
+import dk.intraon.mink.radio.Occupancy
 import dk.intraon.mink.radio.RtlTcpClient
 import dk.intraon.mink.radio.SourceTracker
 import dk.intraon.mink.trip.IqWav
@@ -159,6 +160,8 @@ class MeasureService : Service() {
     private var session = ""
     private var tuneHz = 0.0
     private var tracker: SourceTracker? = null
+    /** Hvor meget af tiden din kanal er optaget af det, der høres. */
+    private val occupancy = Occupancy()
     /** Den gain, dongle'n faktisk står på (et skift venter, til der er stille). */
     @Volatile private var appliedGain = 0.0
     /** Den PPM-korrektion, donglen står på. */
@@ -244,6 +247,7 @@ class MeasureService : Service() {
         burstsInTick = 0; targetInTick = 0; strongestTarget = null; strongestAny = null; quietTicks = 0; anchorWall = 0
         blocksSeen = 0; frameBase = 0; ppmShiftHz = 0.0; ppmShiftAt = 0
         pendingGain = null; pendingBand = null; bandChangedAt = 0
+        occupancy.start(System.currentTimeMillis())
         Hub.bandLoHz = cfg.bandLoHz; Hub.bandHiHz = cfg.bandHiHz; Hub.homeLoHz = cfg.bandLoHz; Hub.homeHiHz = cfg.bandHiHz
 
         wake = (getSystemService(POWER_SERVICE) as PowerManager)
@@ -330,6 +334,9 @@ class MeasureService : Service() {
         tuneHz = cfg.tuneHz
         client?.changeFreq(cfg.tuneHz.toLong())
         bandChangedAt = System.currentTimeMillis()
+        // i det nye bånd høres andre sendere: optagetheden begynder forfra
+        occupancy.start(bandChangedAt)
+        Hub.channelBusy = null; Hub.channelSenders = 0
         targetInTick = 0; strongestTarget = null
         Hub.bandLoHz = loHz; Hub.bandHiHz = hiHz
         // hjemme er alt som før; kun under et kig kan målet ligge uden for det, detektoren søger i
@@ -437,6 +444,7 @@ class MeasureService : Service() {
         var freq = b.freqHz
         if (ppmShiftHz != 0.0 && b.tStartMs - ppmShiftAt < 600 && !tr.near(freq) && tr.near(freq + ppmShiftHz)) freq += ppmShiftHz
         val (src, isTarget) = tr.add(b.tStartMs, freq, b.peakSnr, level, b.bwHz)
+        occupancy.add(b.tStartMs, b.durMs, freq, src)
         if (isTarget && pendingBwHz == null && b.tStartMs - bwChangedAt > 30_000) {
             val t = tr.snapshot().firstOrNull { it.target }
             val bw = t?.bwHz
@@ -524,6 +532,11 @@ class MeasureService : Service() {
                 .put("maxsnr", st.maxSnr?.let { r1(it) } ?: JSONObject.NULL)
                 .put("clip", r1(st.clipPct)).put("frames", st.frames)
             if (!Hub.targetHeard) o.put("away", true)
+            // din kanals optagethed: kun når hele kanalen ligger i det bånd, der lyttes på
+            val chLo = Hub.channelHz - Hub.channelBwHz / 2; val chHi = Hub.channelHz + Hub.channelBwHz / 2
+            val share = if (Hub.channelHz > 0 && Hub.channelBwHz > 0 && chLo >= Hub.bandLoHz && chHi <= Hub.bandHiHz) occupancy.share(chLo, chHi, now) else null
+            Hub.channelBusy = share?.fraction; Hub.channelSenders = share?.senders ?: 0
+            if (share != null) o.put("busy", r1(share.fraction * 100))
             record(o)
             turnDone(now)
             if (targetInTick == 0) {
