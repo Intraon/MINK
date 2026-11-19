@@ -28,8 +28,15 @@ object Hub {
     /** Et mærke, brugeren har sat. [kind] er en af typerne i [MarkKind]. */
     data class Mark(val t: Long, val lat: Double?, val lon: Double?, val n: Int, val kind: String = MarkKind.PLAIN)
     data class GainStep(val t: Long, val to: Double)
-    /** En gemt pejling: herfra, i den retning, med det niveau (null = intet hørt, da den blev taget). */
-    data class BearingLine(val t: Long, val lat: Double?, val lon: Double?, val deg: Double, val level: Double?, val n: Int)
+    /**
+     * En gemt pejling: herfra, i den retning, med det niveau (null = intet hørt, da den blev taget). For et sted,
+     * der er målt en omgang rundt, er [swing] forskellen i dB mellem den stærkeste og den svageste retning, og
+     * [others] er andre retninger, der var næsten lige så stærke (genskin). Null og tom for en pejling uden omgang.
+     */
+    data class BearingLine(
+        val t: Long, val lat: Double?, val lon: Double?, val deg: Double, val level: Double?, val n: Int,
+        val swing: Double? = null, val others: List<Double> = emptyList(),
+    )
 
     @Volatile var running = false
     @Volatile var conn = Conn.STOPPED

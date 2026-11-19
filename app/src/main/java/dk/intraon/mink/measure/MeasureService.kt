@@ -41,6 +41,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -638,7 +639,7 @@ class MeasureService : Service() {
             .put("cmp", if (Hub.compassPoor) "poor" else "ok").put("ut", Hub.magUt?.let { r1(it) } ?: JSONObject.NULL)
             // fladt = retningen er telefonens øverste kant; ellers er det dér, kameraet ser hen
             .put("flat", Hub.flat).put("photo", photo?.let { "${FigureExport.DIR}/$it" } ?: JSONObject.NULL)
-        Hub.rose.best()?.let { o.put("best", r1(it)) }
+        Hub.rose.lobe()?.let { o.put("best", r1(it.center)).put("swing", r1(it.swing)).put("others", JSONArray(it.others.map { d -> r1(d) })) }
         record(o)
         Hub.changed()
     }
@@ -651,18 +652,20 @@ class MeasureService : Service() {
     }
 
     /**
-     * Gemmer et steds stærkeste retning som pejling, uden at brugeren har trykket: stedet og retningen kommer fra
-     * rosen, niveauet er stedets stærkeste måling. [held] er tidspunktet for den måling, kameraskærmen holdt et
-     * billede af, da stedet blev afleveret; er det stedets stærkeste, får pejlingen et foto, som skærmen gemmer.
+     * Gemmer et steds stærkeste retning som pejling, uden at brugeren har trykket: stedet og retningen (midten af
+     * toppen) kommer fra rosen, niveauet er stedets stærkeste måling. [held] er tidspunktet for den måling,
+     * kameraskærmen holdt et billede af, da stedet blev afleveret; er det målingen nærmest retningen, får pejlingen
+     * et foto, som skærmen gemmer.
      */
     private fun autoBearing(stop: Rose.Stop, held: Long) {
         val now = System.currentTimeMillis()
         val n = Hub.bearings.size + 1
         val photo = if (held != 0L && held == stop.at) "MINK_pejling_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date(stop.at)) + ".jpg" else null
-        Hub.bearings.add(Hub.BearingLine(now, stop.lat, stop.lon, stop.best, stop.level, n))
+        Hub.bearings.add(Hub.BearingLine(now, stop.lat, stop.lon, stop.best, stop.level, n, stop.lobe.swing, stop.lobe.others))
         val o = JSONObject().put("type", "bearing").put("t", iso(now))
             .put("lat", (stop.lat * 1e6).roundToInt() / 1e6).put("lon", (stop.lon * 1e6).roundToInt() / 1e6)
             .put("hdg", r1(stop.best)).put("lvl", r1(stop.level)).put("best", r1(stop.best)).put("n", n).put("auto", true)
+            .put("top", r1(stop.lobe.top)).put("swing", r1(stop.lobe.swing)).put("others", JSONArray(stop.lobe.others.map { r1(it) }))
             .put("photo", photo?.let { "${FigureExport.DIR}/$it" } ?: JSONObject.NULL)
         record(o)
         Hub.autoBearing = Hub.AutoBearing(stop, n, photo)

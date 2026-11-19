@@ -41,7 +41,7 @@ class MapPageTest {
         val top = mapOf(165 to -64.0, 195 to -61.0, 225 to -62.0, 255 to -63.0, 285 to -64.0)
         val samples = (0 until 12).map { it * 30 + 15 }.flatMap { deg -> List(2) { deg.toDouble() to (top[deg] ?: -78.0) } }
 
-        val lobe = MapPage.lobe(samples)!!
+        val lobe = dk.intraon.mink.direction.Lobe.of(samples)!!
 
         assertTrue("midten var ${lobe.center}", lobe.center in 212.0..230.0)
         assertEquals(17.0, lobe.swing, 0.01)

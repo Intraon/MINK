@@ -1,5 +1,6 @@
 package dk.intraon.mink.trip
 
+import dk.intraon.mink.direction.Lobe
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.OffsetDateTime
@@ -20,14 +21,8 @@ object MapPage {
     /** En logfil: navnet og dens linjer. */
     class Log(val name: String, val lines: List<String>)
 
-    /** En pejlings brede top: tyngdepunktet i grader og udsvinget i dB mellem den kraftigste og den svageste retning. */
-    class Lobe(val center: Double, val swing: Double)
-
     private const val STILL_M = 100.0       // en tur, der holder sig inden for så mange meter, er stillestående
     private const val JOIN_S = 6 * 60L      // ture med kortere pause end dette vises som én
-    private const val STEP = 10             // toppen måles i retninger med så mange graders mellemrum
-    private const val HALF = 20.0           // hver retning er medianen af målingerne inden for så mange grader til hver side
-    private const val MIN = 2               // en retning tæller først med så mange målinger
 
     private class Trip(
         val id: String, val t0: Double, val t1: Double, val offset: Int, var kind: String,
@@ -48,26 +43,6 @@ object MapPage {
             val o = try { JSONObject(line) } catch (_: Exception) { return@mapNotNull null }
             if (o.isNull("lat") || o.isNull("lon")) null else o.getDouble("lat") to o.getDouble("lon")
         }
-    }
-
-    /**
-     * Tyngdepunktet af en pejlings top ud fra målingerne under en drejning: (retning, niveau). Toppen er typisk
-     * bred og skæv, så den ene kraftigste retning kan ligge 20 grader fra midten. Retningerne inden for 6 dB af den
-     * kraftigste vejes med deres effekt. Null, hvis der er målt nok i færre end halvdelen af retningerne.
-     */
-    fun lobe(samples: List<Pair<Double, Double>>): Lobe? {
-        val dirs = (0 until 360 step STEP).mapNotNull { deg ->
-            val near = samples.filter { kotlin.math.abs(((it.first - deg) % 360 + 540) % 360 - 180) <= HALF }
-            if (near.size >= MIN) deg to median(near.map { it.second }) else null
-        }
-        if (dirs.size < 360 / STEP / 2) return null
-        val top = dirs.maxOf { it.second }
-        var x = 0.0; var y = 0.0
-        for ((deg, level) in dirs) if (level >= top - 6) {
-            val w = 10.0.pow(level / 10); val a = Math.toRadians(deg.toDouble())
-            x += w * sin(a); y += w * cos(a)
-        }
-        return Lobe((Math.toDegrees(atan2(x, y)) + 360) % 360, top - dirs.minOf { it.second })
     }
 
     /** Turenes data til kortfilen som JSON: én post pr. tur, med ture lige efter hinanden slået sammen. */
@@ -167,7 +142,7 @@ object MapPage {
                 placed(x) && !x.isNull("hdg") && !x.optBoolean("hdg_poor") && t(x)!! in (at - 300)..(at + 5) &&
                     x.optDouble("spd", 0.0) < 2 && meters(x.getDouble("lat"), x.getDouble("lon"), lat, lon) <= 30
             }.map { it.getDouble("hdg") to it.getDouble("lvl") }
-            val lobe = lobe(turn)
+            val lobe = Lobe.of(turn)
             JSONObject().put("lat", lat).put("lon", lon).put("t", (at - t0).roundToLong()).put("n", o.optInt("n"))
                 .put("hdg", if (o.isNull("hdg")) JSONObject.NULL else o.getDouble("hdg"))
                 .put("best", if (o.isNull("best") || !o.has("best")) JSONObject.NULL else o.getDouble("best"))
@@ -175,6 +150,7 @@ object MapPage {
                 .put("poor", o.optString("cmp") == "poor").put("auto", o.optBoolean("auto"))
                 .put("photo", if (o.isNull("photo") || !o.has("photo")) JSONObject.NULL else o.getString("photo").substringAfterLast('/'))
                 .put("center", lobe?.let { r1(it.center) } ?: JSONObject.NULL).put("swing", lobe?.let { r1(it.swing) } ?: JSONObject.NULL)
+                .put("others", JSONArray(lobe?.others?.map { r1(it) } ?: emptyList<Double>()))
         }
         val marks = recs.filter { it.optString("type") == "mark" && it in times && placed(it) }.map { o ->
             JSONObject().put("lat", o.getDouble("lat")).put("lon", o.getDouble("lon")).put("t", (t(o)!! - t0).roundToLong())

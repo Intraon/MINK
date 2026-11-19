@@ -40,7 +40,9 @@ class RoseTest {
         val left = r.add(190.0, -70.0, 56.0005, 9.0, t = 200_000L)!!     // 55 m væk
         assertEquals(185.0, left.best, 6.0)
         assertEquals(-62.0, left.level, 0.01)
-        assertEquals(1_000L + 180 * 400L, left.at)
+        // fotoet hører til en måling taget i toppen: turen går 5°, 15°, … og målingen i retningen d + 5 er taget til tiden d * 400
+        val photoDeg = (left.at - 1_000L) / 400 + 5.0
+        assertEquals("fotoet er taget i $photoDeg°", 185.0, photoDeg, 25.0)
         assertEquals(56.0, left.lat, 1e-9)
         assertEquals(36, left.rose.filled())
         assertEquals("rosen er begyndt forfra på det nye sted", 1, r.filled())

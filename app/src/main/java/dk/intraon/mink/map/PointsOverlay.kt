@@ -16,7 +16,11 @@ import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.Overlay
 
 /** Så lang tegnes en pejling på kortet (meter). */
-private const val BEARING_M = 3_000.0
+private const val BEARING_M = 8_000.0
+/** Så mange grader til hver side er en pejling usikker: fjerne pejlinger gennem bebyggelse rammer ca. 10° ved siden af. */
+private const val WEDGE_DEG = 10.0
+/** Et sted har en tydelig retning, når niveauet svinger mindst så mange dB en omgang rundt. */
+private const val CLEAR_DB = 10.0
 /** Farven på spor og felter, hvor der blev lyttet uden at høre målet. */
 private const val QUIET = 0xFF808891.toInt()
 
@@ -42,6 +46,8 @@ class PointsOverlay(private val d: Float) : Overlay() {
     @Volatile var heatLegend = ""
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val pt = Point()
+    private val wedge = Path()
+    private val dashes = android.graphics.DashPathEffect(floatArrayOf(10 * d, 8 * d), 0f)
     private val pt2 = Point()
     private val gp = GeoPoint(0.0, 0.0)
     private var grid: HeatGrid? = null
@@ -157,16 +163,34 @@ class PointsOverlay(private val d: Float) : Overlay() {
         else "felter à $sizeTxt · blå ${Ui.f1(range.first)} → rød ${Ui.f1(range.second)} dB · gråt = intet hørt"
     }
 
-    /** Gemte pejlinger: en streg på [BEARING_M] meter fra stedet i den retning, antennen pegede. */
+    /**
+     * Gemte pejlinger: en streg på [BEARING_M] meter fra stedet i den retning, antennen pegede. Er stedet målt en
+     * omgang rundt med en tydelig top, ligger stregen i en kile på [WEDGE_DEG] grader til hver side: så usikker er en
+     * pejling, og kilerne fra flere steder viser et område, hvor tynde streger ville vise et punkt. Kom signalet
+     * lige stærkt fra flere retninger, er der ingen kile, og hver retning er en stiplet streg.
+     */
     private fun drawBearings(c: Canvas, mv: Projection) {
         for (list in bearings()) for (b in list) {
             val lat = b.lat ?: continue; val lon = b.lon ?: continue
             px(mv, lat, lon)
             val x0 = pt.x.toFloat(); val y0 = pt.y.toFloat()
-            val (lat2, lon2) = Bearing.destination(lat, lon, b.deg, BEARING_M)
-            px(mv, lat2, lon2)
+            fun end(deg: Double): Pair<Float, Float> {
+                val (lat2, lon2) = Bearing.destination(lat, lon, deg, BEARING_M)
+                px(mv, lat2, lon2)
+                return pt.x.toFloat() to pt.y.toFloat()
+            }
+            val several = b.others.isNotEmpty()
+            val swing = b.swing
+            if (!several && swing != null && swing >= CLEAR_DB) {
+                val (ax, ay) = end(b.deg - WEDGE_DEG); val (bx, by) = end(b.deg + WEDGE_DEG)
+                wedge.rewind(); wedge.moveTo(x0, y0); wedge.lineTo(ax, ay); wedge.lineTo(bx, by); wedge.close()
+                p.style = Paint.Style.FILL; p.color = 0x33FFC94D
+                c.drawPath(wedge, p)
+            }
             p.style = Paint.Style.STROKE; p.strokeWidth = 2.5f * d; p.color = 0xFFFFC94D.toInt()
-            c.drawLine(x0, y0, pt.x.toFloat(), pt.y.toFloat(), p)
+            if (several) p.pathEffect = dashes
+            for (deg in listOf(b.deg) + b.others) { val (x, y) = end(deg); c.drawLine(x0, y0, x, y, p) }
+            p.pathEffect = null
             p.style = Paint.Style.FILL
             c.drawCircle(x0, y0, 4 * d, p)
         }
