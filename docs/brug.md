@@ -87,13 +87,15 @@ Slå **Jeg har en retningsantenne** til under ⚙. Så gemmer appen, hvilken vej
 
 **På højkant**, som når du tager et billede, viser skærmen kameraet med et sigtekorn. Drej langsomt rundt: hver måling farver den retning, antennen pegede i, på et bånd langs horisonten, og en lille roset viser hele omgangen. Når fire retninger er målt, markerer appen den stærkeste.
 
+Ringen om rosetten viser, hvor langt omgangen er nået: den får et stykke for hver retning, der er målt nok i (mindst to udbrud), og ved siden af står, hvor der mangler, for eksempel **omgangen mangler 120° omkring NØ**. Når ringen er hel og grøn, står der **omgangen er færdig**. Så har stedet givet, hvad det kan, og du kan gå videre. Med et mål, der sender hvert fjerde sekund, tager en omgang to til tre minutter.
+
 **Fladt**, med kameraet mod jorden, slukker appen kameraet og viser en stor kompasrose. Så er det telefonens øverste kant, der skal pege samme vej som antennen. Nogle telefoners kompas er mest præcist sådan.
 
 **Tag pejling** gemmer et foto med retning og styrke i galleriet og en streg på kortet. To-tre pejlinger fra forskellige steder krydser hinanden ved senderen.
 
 Retningen er midten af den brede top og ikke den ene kraftigste måling. På kortet ligger stregen i en kile på 10° til hver side, når stedet har en tydelig retning: så usikker er en pejling, især på afstand og gennem bebyggelse, og det er dér, hvor kilerne fra flere steder dækker hinanden, du skal lede. Kommer signalet næsten lige stærkt fra flere sider, skriver appen **flere retninger** og tegner dem stiplet uden kile. Det er genskin fra noget stort i nærheden, og så er stedet ikke til at pejle fra.
 
-Appen gemmer også selv en pejling for hvert sted, hvor du har drejet mindst en halv omgang rundt: stregen peger mod midten af toppen, og fotoet er kamerabilledet fra den måling, der blev taget nærmest den retning. Det sker, når du går mere end 15 m videre, forlader fanen Kamera eller stopper målingen. Hvert sted gemmes én gang. **Mål** vælger målet uden at gå tilbage til vandfaldet.
+Appen gemmer også selv en pejling for hvert sted, hvor du har drejet mindst en halv omgang rundt: stregen peger mod midten af toppen, og fotoet er kamerabilledet fra den måling, der blev taget nærmest den retning. Det sker, så snart omgangen er færdig, og ellers når du går mere end 15 m videre, forlader fanen Kamera eller stopper målingen. Hvert sted gemmes én gang. **Mål** vælger målet uden at gå tilbage til vandfaldet.
 
 Det skal du vide:
 

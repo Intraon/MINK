@@ -18,7 +18,7 @@ class Lobe(val center: Double, val top: Double, val swing: Double, val others: L
 
     companion object {
         /** Toppen måles i retninger med så mange graders mellemrum … */
-        private const val STEP = 10
+        const val STEP = 10
         /** … hver er medianen af målingerne inden for så mange grader til hver side … */
         private const val HALF = 20.0
         /** … og tæller først med så mange målinger, så en enkelt afviger ikke bliver til en top. */
@@ -36,10 +36,7 @@ class Lobe(val center: Double, val top: Double, val swing: Double, val others: L
          */
         fun of(samples: List<Pair<Double, Double>>, minDirs: Int = 360 / STEP / 2): Lobe? {
             val n = 360 / STEP
-            val level = DoubleArray(n) { k ->
-                val near = samples.filter { abs(Bearing.diff(it.first, (k * STEP).toDouble())) <= HALF }.map { it.second }.sorted()
-                if (near.size < MIN) Double.NaN else if (near.size % 2 == 1) near[near.size / 2] else (near[near.size / 2 - 1] + near[near.size / 2]) / 2
-            }
+            val level = levels(samples)
             val have = (0 until n).filter { !level[it].isNaN() }
             if (have.isEmpty() || have.size < minDirs) return null
             val top = have.maxByOrNull { level[it] }!!
@@ -75,6 +72,15 @@ class Lobe(val center: Double, val top: Double, val swing: Double, val others: L
                 if (level[start] >= level[top] - OTHER_DB) others.add(middle(other, level))
             }
             return Lobe(middle(main, level), level[top], level[top] - have.minOf { level[it] }, others.sorted())
+        }
+
+        /**
+         * Niveauet i hver retning (nummer k ligger i k · [STEP] grader): medianen af målingerne omkring den. NaN, hvor
+         * der ikke er målt nok.
+         */
+        fun levels(samples: List<Pair<Double, Double>>): DoubleArray = DoubleArray(360 / STEP) { k ->
+            val near = samples.filter { abs(Bearing.diff(it.first, (k * STEP).toDouble())) <= HALF }.map { it.second }.sorted()
+            if (near.size < MIN) Double.NaN else if (near.size % 2 == 1) near[near.size / 2] else (near[near.size / 2 - 1] + near[near.size / 2]) / 2
         }
 
         /** Tyngdepunktet af retningerne [dirs], vejet med deres effekt. */
