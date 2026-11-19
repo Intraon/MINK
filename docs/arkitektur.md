@@ -39,7 +39,7 @@ Kildekoden ligger i `app/src/main/java/dk/intraon/mink/`, én mappe pr. komponen
 | `waterfall/` | Vandfaldets data og visning, og målebilledet | `Scope`, `Figure`, `Pen` | `WaterfallView`, `CanvasPen`, `FigureExport` |
 | `map/` | Kortlaget, turens spor, varmekortet og tidligere ture på kortet, og baggrundskortet til kortfilen | `Track`, `HeatGrid`, `TripPoints`, `VectorTile`, `BaseMap`, `TileSource` | `PointsOverlay`, `MapData`, `MapExport` |
 | `replay/` | En tidligere tur som vandfald, genskabt fra log og bølgeform | `Replay`, `ClipSpectrum` | `IqClips`, `ReplayView`, `ReplayPane` |
-| `direction/` | Retningsantenne: retninger, roset, kompas og kameraskærm | `Bearing`, `Rose`, `Lobe`, `CompassCheck`, `HeadingFilter`, `FlatLayout`, `CameraWatch` | `Compass`, `CameraPane` |
+| `direction/` | Retningsantenne: retninger, roset, kompas og kameraskærm | `Bearing`, `Rose`, `Lobe`, `Turn`, `CompassCheck`, `HeadingFilter`, `FlatLayout`, `CameraWatch` | `Compass`, `CameraPane` |
 | `trip/` | Turens filer: log, bølgeform, hvilke filer der hører til en tur, hvilke ture der er delt, kortfilen og deling | `TripFiles`, `SharedTrips`, `ZipPack`, `MapPage` | `JsonlLog`, `IqWav`, `Export`, `TripShare`, `MapPageExport` |
 | `update/` | Opdatering fra GitHub-udgivelser | `Releases` | `Updater` |
 | `ui/` | Hovedskærmen, indstillingerne, vejledningen, grafen og fælles farver | – | `MainActivity`, `SettingsScreen`, `Guide`, `LevelGraphView`, `Ui` |

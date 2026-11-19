@@ -5,7 +5,8 @@ package dk.intraon.mink.direction
  * antennen pegede i. Flytter man sig, gælder retningerne ikke længere, og rosen begynder forfra.
  *
  * Et sted, hvor der er målt mindst en halv omgang rundt, afleveres som en [Stop], når man går videre ([add]) eller
- * beder om det ([finish]): det er stedets pejling. Hvert sted afleveres højst én gang.
+ * beder om det ([finish]): det er stedets pejling. Hvert sted afleveres højst én gang. [turn] siger, hvor langt
+ * omgangen er nået.
  */
 class Rose(val binDeg: Int = 10) {
     /**
@@ -24,6 +25,8 @@ class Rose(val binDeg: Int = 10) {
     private val samples = ArrayList<Pair<Double, Double>>()
     /** Toppen, regnet ud ved den seneste måling, så skærmen ikke skal regne den ud for hvert billede. */
     private var live: Lobe? = null
+    /** Omgangen, regnet ud ved den seneste måling. */
+    private var round: Turn? = null
     /** Retningen for den måling, [topAt] hører til. */
     private var topDeg = Double.NaN
     /**
@@ -42,7 +45,7 @@ class Rose(val binDeg: Int = 10) {
     fun reset() { clear(); lat = Double.NaN; lon = Double.NaN }
 
     private fun clear() {
-        level.fill(Double.NaN); count.fill(0); samples.clear(); live = null
+        level.fill(Double.NaN); count.fill(0); samples.clear(); live = null; round = null
         topLevel = Double.NaN; topDeg = Double.NaN; topAt = 0L; handed = false
     }
 
@@ -67,6 +70,7 @@ class Rose(val binDeg: Int = 10) {
         if (strongest) topLevel = lvl
         // fotoet følger retningen: den nye måling tager over, når den ligger mindst lige så tæt på toppens midte
         live = Lobe.of(samples, LIVE_DIRS)
+        round = Turn.of(samples)
         val mid = live?.center
         val closer = mid != null && (topDeg.isNaN() || kotlin.math.abs(Bearing.diff(deg, mid)) <= kotlin.math.abs(Bearing.diff(topDeg, mid)))
         if (closer || (mid == null && strongest)) { topAt = t; topDeg = deg }
@@ -85,7 +89,7 @@ class Rose(val binDeg: Int = 10) {
         handed = true
         val copy = Rose(binDeg)
         System.arraycopy(level, 0, copy.level, 0, bins); System.arraycopy(count, 0, copy.count, 0, bins)
-        copy.samples.addAll(samples); copy.live = live
+        copy.samples.addAll(samples); copy.live = live; copy.round = round
         return Stop(lat, lon, lobe.center, topLevel, topAt, copy, lobe)
     }
 
@@ -107,6 +111,9 @@ class Rose(val binDeg: Int = 10) {
      * bare der, man tilfældigvis pegede.
      */
     @Synchronized fun lobe(): Lobe? = live
+
+    /** Hvor langt omgangen på stedet er nået ([Turn]). Null, før der er målt. */
+    @Synchronized fun turn(): Turn? = round
 
     /** Den stærkeste retning: midten af toppen. Null, før der er en ([lobe]). */
     fun best(): Double? = lobe()?.center

@@ -325,7 +325,9 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
         handled = ab
         val best = ab.stop.best
         // kom signalet lige stærkt fra flere sider, er det genskin, og så skal ingen af retningerne stå alene
-        val what = if (ab.stop.lobe.several) "Stedet har flere retninger (${degrees(ab.stop.lobe)}), sandsynligvis genskin. Det"
+        // er der målt hele vejen rundt, får brugeren at vide, at stedet er færdigt
+        val round = if (ab.stop.rose.turn()?.done == true) "Omgangen er færdig. " else ""
+        val what = round + if (ab.stop.lobe.several) "Stedet har flere retninger (${degrees(ab.stop.lobe)}), sandsynligvis genskin. Det"
         else "Stedets stærkeste retning ${best.roundToInt()}° ${Bearing.name(best)}"
         val shot = held.firstOrNull { it.at == ab.stop.at }
         if (ab.photo == null || shot == null || width == 0) { a.toast("$what er gemt som pejling på kortet"); return }
@@ -416,6 +418,7 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
             }
             p.style = Paint.Style.STROKE; p.color = 0x80FFFFFF.toInt(); p.strokeWidth = 1.5f * d
             c.drawCircle(cx, cy, rr, p)
+            ring(c, rose.turn(), cx, cy, rr + 5 * d, 3 * d)
             p.style = Paint.Style.FILL; p.color = 0xFFFFFFFF.toInt(); p.textSize = 14 * d; p.textAlign = Paint.Align.CENTER
             for ((k, name) in listOf(0 to "N", 90 to "Ø", 180 to "S", 270 to "V")) {
                 c.save(); c.rotate(k.toFloat(), cx, cy); c.drawText(name, cx, cy - rr + 18 * d, p); c.restore()
@@ -435,6 +438,8 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
             p.textSize = 13 * d
             val lobe = rose.lobe()
             c.drawText(if (lobe != null) "▼ ${strongest(lobe)}" else "drej langsomt rundt – ét udbrud pr. retning", cx, lay.bestY, p)
+            val turnY = lay.turnY
+            if (turnY != null) round(rose.turn())?.let { p.color = 0xB0FFFFFF.toInt(); c.drawText(it, cx, turnY, p); p.color = 0xFFFFFFFF.toInt() }
             val n = Hub.bearings.size
             p.textAlign = Paint.Align.LEFT; p.color = 0xB0FFFFFF.toInt(); p.textSize = 12 * d
             c.drawText(if (n == 0) "ingen pejlinger gemt" else "$n ${if (n == 1) "pejling" else "pejlinger"} gemt", 12 * d, lay.countY, p)
@@ -545,6 +550,11 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
             }
             p.style = Paint.Style.STROKE; p.color = 0x80FFFFFF.toInt(); p.strokeWidth = 1 * d
             c.drawCircle(rx, ry, rr, p)
+            ring(c, rose.turn(), rx, ry, rr + 3 * d, 2.5f * d)
+            round(rose.turn())?.let {
+                p.style = Paint.Style.FILL; p.color = 0xFFFFFFFF.toInt(); p.textSize = 13 * d; p.textAlign = Paint.Align.LEFT
+                c.drawText(it, rx + rr + 14 * d, ry + 5 * d, p)
+            }
             // nålen: dér peger telefonen
             p.color = 0xFFFFFFFF.toInt(); p.strokeWidth = 2.5f * d
             c.drawLine(rx, ry, rx + (rr * sin(Math.toRadians(hdg))).toFloat(), ry - (rr * cos(Math.toRadians(hdg))).toFloat(), p)
@@ -554,6 +564,26 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
             p.textAlign = Paint.Align.RIGHT; p.textSize = 13 * d
             c.drawText(if (n == 0) "ingen pejlinger gemt" else "$n ${if (n == 1) "pejling" else "pejlinger"} gemt", w - 12 * d, h - 78 * d, p)
             p.textAlign = Paint.Align.LEFT
+        }
+
+        /**
+         * Ringen om rosen: et stykke for hver retning, der er målt nok i. Den lukker sig, mens der drejes, og er
+         * hel, når omgangen er færdig.
+         */
+        private fun ring(c: Canvas, turn: Turn?, x: Float, y: Float, r: Float, width: Float) {
+            turn ?: return
+            p.style = Paint.Style.STROKE; p.strokeWidth = width; p.color = if (turn.done) Ui.GREEN else Ui.ACCENT
+            arc.set(x - r, y - r, x + r, y + r)
+            val step = 360f / turn.of
+            for (k in 0 until turn.of) if (turn.has(k)) c.drawArc(arc, k * step - step / 2 - 90, step, false, p)
+            p.style = Paint.Style.FILL
+        }
+
+        /** Teksten om omgangen: hvor der mangler at blive målt, eller at den er færdig. Null, før der er målt. */
+        private fun round(turn: Turn?): String? {
+            if (turn == null || turn.count == 0) return null
+            val (mid, width) = turn.missing ?: return "omgangen er færdig"
+            return "omgangen mangler $width° omkring ${Bearing.name(mid)}"
         }
 
         private fun center(c: Canvas, text: String, cx: Float, cy: Float) {

@@ -69,6 +69,8 @@ class MeasureService : Service() {
         private const val EXTRA_HI = "hi"
         /** Så længe efter at tuneren er flyttet, regnes det, der høres, ikke for en måling: tuneren falder først til ro. */
         private const val SETTLE_MS = 300L
+        /** Så længe får kameraskærmen til at holde billedet af den nyeste måling, før en færdig omgang gemmes uden foto. */
+        private const val HOLD_WAIT_MS = 3_000L
         const val EXTRA_PPM = "ppm"
         private const val EXTRA_HZ = "hz"
         private const val EXTRA_DB = "db"
@@ -139,6 +141,8 @@ class MeasureService : Service() {
     /** Et bånd, der skal lyttes på fra næste blok, og hvornår båndet sidst blev flyttet. */
     @Volatile private var pendingBand: Pair<Double, Double>? = null
     @Volatile private var bandChangedAt = 0L
+    /** Hvornår omgangen på stedet blev færdig; 0 = den er ikke færdig. */
+    @Volatile private var turnDoneAt = 0L
     private var bwChangedAt = 0L
     /** Blokke modtaget i alt, og hvor mange der var gået, da den nuværende detektor begyndte at tælle fra nul. */
     private var blocksSeen = 0L
@@ -460,6 +464,7 @@ class MeasureService : Service() {
         record(o)
         // målingen blev taget et nyt sted: det sted, brugeren forlod, bliver til en pejling
         left?.let { autoBearing(it, held) }
+        if (isTarget) turnDone(System.currentTimeMillis())
         burstsInTick++
         if (b.peakDbfs > (strongestAny ?: -999.0)) strongestAny = b.peakDbfs
         Hub.sources = tr.snapshot()
@@ -520,6 +525,7 @@ class MeasureService : Service() {
                 .put("clip", r1(st.clipPct)).put("frames", st.frames)
             if (!Hub.targetHeard) o.put("away", true)
             record(o)
+            turnDone(now)
             if (targetInTick == 0) {
                 quietTicks++
                 if (st.frames > 0 && hasTarget) {
@@ -642,6 +648,17 @@ class MeasureService : Service() {
         Hub.rose.lobe()?.let { o.put("best", r1(it.center)).put("swing", r1(it.swing)).put("others", JSONArray(it.others.map { d -> r1(d) })) }
         record(o)
         Hub.changed()
+    }
+
+    /**
+     * Er der målt hele vejen rundt på stedet, gemmes dets pejling, så brugeren kan gå videre uden at vente. Er den
+     * måling, fotoet skal vise, helt ny, får kameraskærmen først et øjeblik til at holde billedet af den.
+     */
+    private fun turnDone(now: Long) {
+        if (Hub.rose.turn()?.done != true) { turnDoneAt = 0; return }
+        if (turnDoneAt == 0L) turnDoneAt = now
+        val held = Hub.heldFrameAt
+        if (held == Hub.rose.topAt || now - turnDoneAt >= HOLD_WAIT_MS) Hub.rose.finish()?.let { autoBearing(it, held) }
     }
 
     /** Stedet er færdigt (kameraskærmen forlades, eller målingen stoppes): gem dets pejling, hvis det er en værd. */
