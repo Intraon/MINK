@@ -35,6 +35,8 @@ Tryk på et signal for at gøre det til **målet**. En rød linje markerer det, 
 
 **Træk til siden** i vandfaldet for at kigge på nabofrekvenserne. Båndet flytter med, og et blåt felt siger, hvad du ser. Ligger målet stadig i det, du ser, måles der videre. Ligger det udenfor, peger et mærke i kanten hen mod det, tallet og pilen holder pause, og der skrives ikke stille punkter imens. Sendere, du ser dér, gemmes i loggen som de andre. **Tilbage** fører hjem til turens bånd. Vælger du et mål under kigget, bliver båndet dér resten af turen, og det gemmes som båndet til næste tur.
 
+Har du skrevet din egen kanal i indstillingerne, står der over vandfaldet, hvor optaget den er: **Din kanal er optaget 19 % af tiden af 2 sendere**. Tallet er den del af det seneste minut, hvor mindst én af de smalle sendere, appen hører, sendte inden for kanalen. Det siger, hvor meget en pakke på kanalen har at kæmpe med, uanset hvor senderne står. Appen tæller kun det, den kan høre: står du langt væk, eller peger en retningsantenne den anden vej, bliver tallet for lavt.
+
 Målet skifter aldrig af sig selv, heller ikke når noget andet bliver stærkere. Intet mål er valgt på forhånd, og dit seneste valg huskes til næste tur.
 
 Signalbredden følger målet: er målet bredere eller smallere end den bredde, appen står på, stiller den sig ind efter nogle målinger. Det gælder resten af turen.

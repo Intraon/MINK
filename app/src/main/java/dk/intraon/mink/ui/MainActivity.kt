@@ -896,6 +896,13 @@ class MainActivity : Activity() {
         val others = srcs.filter { !it.target }
         sourcesTv.visibility = if (running) View.VISIBLE else View.GONE
         sourcesTv.text = buildString {
+            // det tal, der betyder noget for den, der bruger kanalen: hvor meget af tiden andre sender i den
+            Hub.channelBusy?.let { busy ->
+                val n = Hub.channelSenders
+                append("Din kanal er optaget ${(busy * 100).roundToInt()} % af tiden")
+                if (n > 0) append(if (n == 1) " af 1 sender" else " af $n sendere")
+                append("\n")
+            }
             append("Mål: ")
             append(
                 when {
