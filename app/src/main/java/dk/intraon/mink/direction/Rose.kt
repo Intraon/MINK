@@ -1,9 +1,5 @@
 package dk.intraon.mink.direction
 
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-
 /**
  * Styrken pr. retning fra ét sted: kompasset delt i felter a [binDeg] grader. Hver måling lægges i det felt,
  * antennen pegede i. Flytter man sig, gælder retningerne ikke længere, og rosen begynder forfra.
@@ -13,17 +9,27 @@ import kotlin.math.sin
  */
 class Rose(val binDeg: Int = 10) {
     /**
-     * Et sted, der er målt færdigt: hvor det var, den stærkeste retning [best], den stærkeste enkelte måling
-     * ([level], taget [at]) og rosen, som den så ud.
+     * Et sted, der er målt færdigt: hvor det var, den stærkeste retning [best] (midten af toppen, se [lobe]), den
+     * stærkeste enkelte måling [level], tidspunktet [at] for den måling, der blev taget nærmest retningen, og rosen,
+     * som den så ud.
      */
-    class Stop(val lat: Double, val lon: Double, val best: Double, val level: Double, val at: Long, val rose: Rose)
+    class Stop(val lat: Double, val lon: Double, val best: Double, val level: Double, val at: Long, val rose: Rose, val lobe: Lobe)
 
     val bins = 360 / binDeg
     private val level = DoubleArray(bins) { Double.NaN }
     private val count = IntArray(bins)
     private var topLevel = Double.NaN
     private var handed = false
-    /** Tidspunktet for stedets stærkeste måling indtil nu; 0, før der er målt. */
+    /** Hver måling på stedet som (retning, niveau): det, [lobe] regner toppen ud fra. */
+    private val samples = ArrayList<Pair<Double, Double>>()
+    /** Toppen, regnet ud ved den seneste måling, så skærmen ikke skal regne den ud for hvert billede. */
+    private var live: Lobe? = null
+    /** Retningen for den måling, [topAt] hører til. */
+    private var topDeg = Double.NaN
+    /**
+     * Tidspunktet for den måling, der indtil nu er taget nærmest stedets stærkeste retning; 0, før der er målt.
+     * Det er den måling, et foto af stedet skal vise. Før der er en retning, er det den stærkeste måling.
+     */
     @Volatile var topAt = 0L
         private set
     /** Stedet, rosen er målt fra. */
@@ -35,7 +41,10 @@ class Rose(val binDeg: Int = 10) {
     @Synchronized
     fun reset() { clear(); lat = Double.NaN; lon = Double.NaN }
 
-    private fun clear() { level.fill(Double.NaN); count.fill(0); topLevel = Double.NaN; topAt = 0L; handed = false }
+    private fun clear() {
+        level.fill(Double.NaN); count.fill(0); samples.clear(); live = null
+        topLevel = Double.NaN; topDeg = Double.NaN; topAt = 0L; handed = false
+    }
 
     /**
      * En måling i retningen [deg], taget [t]. Er man gået mere end [moveM] meter fra det sted, rosen blev startet,
@@ -52,7 +61,15 @@ class Rose(val binDeg: Int = 10) {
         val i = (Bearing.norm(deg) / binDeg).toInt() % bins
         level[i] = if (count[i] == 0) lvl else 0.5 * level[i] + 0.5 * lvl
         count[i]++
-        if (topLevel.isNaN() || lvl > topLevel) { topLevel = lvl; topAt = t }
+        if (samples.size >= MAX_SAMPLES) samples.removeAt(0)
+        samples.add(Bearing.norm(deg) to lvl)
+        val strongest = topLevel.isNaN() || lvl > topLevel
+        if (strongest) topLevel = lvl
+        // fotoet følger retningen: den nye måling tager over, når den ligger mindst lige så tæt på toppens midte
+        live = Lobe.of(samples, LIVE_DIRS)
+        val mid = live?.center
+        val closer = mid != null && (topDeg.isNaN() || kotlin.math.abs(Bearing.diff(deg, mid)) <= kotlin.math.abs(Bearing.diff(topDeg, mid)))
+        if (closer || (mid == null && strongest)) { topAt = t; topDeg = deg }
         return left
     }
 
@@ -64,11 +81,12 @@ class Rose(val binDeg: Int = 10) {
     @Synchronized
     fun finish(): Stop? {
         if (handed || lat.isNaN() || filled() < bins / 2) return null
-        val best = best() ?: return null
+        val lobe = Lobe.of(samples) ?: return null
         handed = true
         val copy = Rose(binDeg)
         System.arraycopy(level, 0, copy.level, 0, bins); System.arraycopy(count, 0, copy.count, 0, bins)
-        return Stop(lat, lon, best, topLevel, topAt, copy)
+        copy.samples.addAll(samples); copy.live = live
+        return Stop(lat, lon, lobe.center, topLevel, topAt, copy, lobe)
     }
 
     /** Feltets niveau, eller null hvis der ikke er målt i den retning. */
@@ -85,22 +103,18 @@ class Rose(val binDeg: Int = 10) {
     }
 
     /**
-     * Den stærkeste retning: tyngdepunktet af det stærkeste felt og dets naboer, vægtet efter effekt.
-     * Null, før der er målt i mindst [minBins] retninger – ellers er "stærkest" bare der, man tilfældigvis pegede.
+     * Toppen, som den ser ud nu ([Lobe]). Null, før der er målt i mindst fire retninger – ellers er "stærkest"
+     * bare der, man tilfældigvis pegede.
      */
-    @Synchronized
-    fun best(minBins: Int = 4): Double? {
-        if (count.count { it > 0 } < minBins) return null
-        var top = -1
-        for (i in 0 until bins) if (!level[i].isNaN() && (top < 0 || level[i] > level[top])) top = i
-        if (top < 0) return null
-        var sx = 0.0; var sy = 0.0
-        for (d in -1..1) {
-            val i = (top + d + bins) % bins
-            if (level[i].isNaN()) continue
-            val w = Math.pow(10.0, (level[i] - level[top]) / 10)
-            sx += w * sin(Math.toRadians(center(i))); sy += w * cos(Math.toRadians(center(i)))
-        }
-        return Bearing.norm(Math.toDegrees(atan2(sx, sy)))
+    @Synchronized fun lobe(): Lobe? = live
+
+    /** Den stærkeste retning: midten af toppen. Null, før der er en ([lobe]). */
+    fun best(): Double? = lobe()?.center
+
+    private companion object {
+        /** Så mange retninger skal der til, før skærmen viser en retning, mens der drejes. */
+        const val LIVE_DIRS = 4
+        /** Et sted gemmer højst så mange målinger; de ældste glider ud. */
+        const val MAX_SAMPLES = 720
     }
 }

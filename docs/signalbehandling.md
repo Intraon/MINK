@@ -95,7 +95,11 @@ En positiv PPM-korrektion flytter signalerne opad i vandfaldet. Den nye korrekti
 
 **Er kompasset til at stole på** (`CompassCheck`): nej, hvis magnetometeret selv melder lav præcision, eller hvis det målte felt afviger mere end 30 % fra Jordens felt på stedet. Så mærkes målingerne `hdg_poor`, de farver ikke rosetten, og der kan ikke tages en pejling. Kalibreringen kræver, at telefonen har drejet en hel omgang om hver af sine tre akser.
 
-**Rosetten** (`Rose`) deler kompasset i felter a 10°. Hver måling af målet lægges i det felt, antennen pegede i, og flere målinger i samme felt udjævnes. Den stærkeste retning er tyngdepunktet af det stærkeste felt og dets to naboer, vægtet efter effekt, og meldes først, når fire felter er målt. Rosetten begynder forfra, når man har flyttet sig 15 meter eller vælger nyt mål.
+**Rosetten** (`Rose`) deler kompasset i felter a 10°. Hver måling af målet lægges i det felt, antennen pegede i, og flere målinger i samme felt udjævnes. Felterne giver farverne på skærmen.
+
+**Den stærkeste retning** (`Lobe`) regnes af målingerne selv og ikke af den ene kraftigste: toppen er bred, og den kraftigste enkelte måling kan ligge 30° fra dens midte. For hver 10° tages medianen af målingerne inden for 20° til hver side (mindst to, så en enkelt afviger ikke tæller). Toppen er de sammenhængende retninger inden for 6 dB af den kraftigste, og retningen er deres tyngdepunkt, vægtet efter effekt. Den meldes, når fire retninger er målt, og en pejling kræver en halv omgang. Når en anden top uden for den første når inden for 5 dB af den kraftigste, har stedet flere retninger: det er genskin, og ingen af dem bruges alene. Kompasset rettes til geografisk nord med misvisningen på stedet; før GPS har en position, bruges det sted, kortet sidst stod på.
+
+ Rosetten begynder forfra, når man har flyttet sig 15 meter eller vælger nyt mål.
 
 **I kamerabilledet** ligger en retning `tan(forskel) / tan(synsfelt / 2) × halv billedbredde` fra midten (`Bearing.offsetPx`). Synsfeltet regnes ud fra kameraets sensorstørrelse og brændvidde.
 

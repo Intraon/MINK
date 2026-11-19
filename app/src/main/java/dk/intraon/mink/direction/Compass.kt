@@ -7,6 +7,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import dk.intraon.mink.core.Hub
+import dk.intraon.mink.core.Settings
 
 /**
  * Hvilken vej telefonen peger. Lægger retningen i [Hub], rettet fra magnetisk til sand nord, når positionen kendes.
@@ -18,6 +19,8 @@ import dk.intraon.mink.core.Hub
  */
 class Compass(ctx: Context, private val motion: Boolean = false) : SensorEventListener {
     private val sm = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    /** Det sted, kortet sidst stod på (bredde, længde, højde), eller null, hvis kortet aldrig har været vist. */
+    private val lastKnown: Triple<Double, Double, Double>? = Settings(ctx).let { if (it.hasLastPos) Triple(it.lastLat, it.lastLon, 0.0) else null }
     private val mag: Sensor? = sm.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
     /** Tyngdekraftens retning. Har telefonen ingen færdig tyngdesensor, bruges accelerometeret, udjævnet. */
     private val grav: Sensor? = sm.getDefaultSensor(Sensor.TYPE_GRAVITY) ?: sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
@@ -99,11 +102,16 @@ class Compass(ctx: Context, private val motion: Boolean = false) : SensorEventLi
         tiltAt = ns
         val now = System.currentTimeMillis()
         if (now - declinationAt > 60_000) {
-            Hub.location?.let {
-                val field = GeomagneticField(it.latitude.toFloat(), it.longitude.toFloat(), it.altitude.toFloat(), now)
+            // misvisningen ændrer sig kun lidt over hundreder af kilometer, så før GPS har en position, bruges det
+            // sted, kortet sidst stod på: ellers ville turens første retninger stå i magnetisk nord og resten i geografisk
+            val loc = Hub.location
+            val at = if (loc != null) Triple(loc.latitude, loc.longitude, loc.altitude) else lastKnown
+            if (at != null) {
+                val field = GeomagneticField(at.first.toFloat(), at.second.toFloat(), at.third.toFloat(), now)
                 declination = field.declination
                 Hub.magExpectedUt = field.fieldStrength / 1000.0      // nT → µT
-                declinationAt = now
+                // med en rigtig position ventes der et minut til næste gang; uden ses der efter én igen om fem sekunder
+                declinationAt = if (loc != null) now else now - 55_000
             }
         }
         Hub.flat = pt.flat

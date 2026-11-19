@@ -107,7 +107,10 @@ Felterne i `bearing`:
 |---|---|
 | `hdg`, `tilt` | Retning og hældning, som i `burst` |
 | `lvl`, `snr` | Målets styrke, hvis det blev hørt inden for de seneste 6 sekunder; ellers `null` |
-| `best` | Rosettens stærkeste retning på tidspunktet. Mangler, hvis færre end fire retninger var målt |
+| `best` | Rosettens stærkeste retning på tidspunktet: midten af toppen. Mangler, hvis færre end fire retninger var målt |
+| `swing` | Forskellen i dB mellem den stærkeste og den svageste retning på stedet. Under ca. 10 dB har stedet ingen tydelig retning. Står sammen med `best` |
+| `others` | Andre retninger på stedet, der var næsten lige så stærke som `best`, i grader. En tom liste er det normale; ellers er det genskin, og ingen af retningerne kan stoles på alene. Står sammen med `best` |
+| `top` | Niveauet i toppen (medianen af målingerne dér). Kun i en pejling, appen selv gemte |
 | `n` | Pejlingens nummer på turen |
 | `cmp` | `ok` eller `poor`: om kompasset var til at stole på |
 | `ut` | Det målte magnetfelt i µT |

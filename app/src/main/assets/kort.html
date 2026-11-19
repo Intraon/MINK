@@ -49,7 +49,7 @@ input[type=range]{width:100%}
     <div id="ture"></div>
     <h3>Lag</h3>
     <label><input type="checkbox" id="l-stille" checked><span>Stille stykker i gråt <small>(målet blev ikke hørt i 10 s)</small></span></label>
-    <label><input type="checkbox" id="l-pejl" checked><span>Pejlinger og mærker <small>(lang streg = tydelig retning, prikket = ingen)</small></span></label>
+    <label><input type="checkbox" id="l-pejl" checked><span>Pejlinger og mærker <small>(kile = tydelig retning, stiplet = svag eller flere)</small></span></label>
     <h3>Stærkeste steder i det viste</h3>
     <div id="top"></div>
     <p class="lille" id="om" style="margin:10px 0 0"></p>
@@ -257,13 +257,24 @@ function gengiv(){
     if(!tilstand.ture.has(d.id)) continue;
     for(const b of d.bearings){
       const grader=retning(b); if(grader==null) continue;
-      const klar=b.swing!=null&&b.swing>=15&&!b.poor, svag=!klar&&b.swing!=null&&b.swing>=10;
-      const fra=punkt(b.lat,b.lon), til=punkt(...destination(b.lat,b.lon,grader,klar?2000:svag?1000:500));
-      ctx.strokeStyle=LILLA; ctx.globalAlpha=klar?0.95:0.75; ctx.lineWidth=klar?3:2; ctx.setLineDash(klar?[]:svag?[8,6]:[2,6]);
-      ctx.beginPath(); ctx.moveTo(fra[0],fra[1]); ctx.lineTo(til[0],til[1]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+      // flere næsten lige stærke retninger er genskin: så tegnes de alle stiplet, og ingen får en kile
+      const flere=b.others&&b.others.length>0;
+      const klar=!flere&&b.swing!=null&&b.swing>=15&&!b.poor, svag=!klar&&!flere&&b.swing!=null&&b.swing>=10;
+      const langt=klar?8000:svag||flere?3000:500, fra=punkt(b.lat,b.lon);
+      if(klar){
+        // en pejling er usikker ca. 10° til hver side, så en tydelig retning er en kile og ikke en tynd streg
+        const v=punkt(...destination(b.lat,b.lon,grader-10,langt)), h=punkt(...destination(b.lat,b.lon,grader+10,langt));
+        ctx.fillStyle=LILLA; ctx.globalAlpha=0.13; ctx.beginPath(); ctx.moveTo(fra[0],fra[1]); ctx.lineTo(v[0],v[1]); ctx.lineTo(h[0],h[1]); ctx.closePath(); ctx.fill();
+      }
+      ctx.strokeStyle=LILLA; ctx.globalAlpha=klar?0.95:0.75; ctx.lineWidth=klar?3:2; ctx.setLineDash(klar?[]:svag||flere?[8,6]:[2,6]);
+      for(const g of [grader].concat(flere?b.others:[])){
+        const til=punkt(...destination(b.lat,b.lon,g,langt));
+        ctx.beginPath(); ctx.moveTo(fra[0],fra[1]); ctx.lineTo(til[0],til[1]); ctx.stroke();
+      }
+      ctx.setLineDash([]); ctx.globalAlpha=1;
       ctx.beginPath(); ctx.arc(fra[0],fra[1],6,0,7); ctx.fillStyle=LILLA; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle='#fff'; ctx.stroke();
       // zoomet langt ud står mærkaterne oven i hinanden, så dér vises kun prikken
-      const r=z>=12.5?mærkat('P'+(b.n||'')+' · '+Math.round(grader)+'°'+(b.photo&&FOTO[b.photo]?' · foto':''),fra[0]+10,fra[1]-16,LILLA):{x0:0,y0:0,x1:-1,y1:-1};
+      const r=z>=12.5?mærkat('P'+(b.n||'')+' · '+(flere?'flere retninger':Math.round(grader)+'°')+(b.photo&&FOTO[b.photo]?' · foto':''),fra[0]+10,fra[1]-16,LILLA):{x0:0,y0:0,x1:-1,y1:-1};
       mål.push(Object.assign(r,{cx:fra[0],cy:fra[1],åbn:()=>visPejling(b,d)}));
     }
     for(const m of d.marks){
@@ -296,9 +307,11 @@ function visMåling(p){
     '<br>'+tid(p.t,p.tur.off)+(p.spd!=null?' · '+p.spd+' km/t':'')+'<br>'+p.tur.label+'<br><span class="lille">'+p.lat.toFixed(5)+', '+p.lon.toFixed(5)+'</span>');
 }
 function visPejling(b,d){
-  const klar=b.swing!=null&&b.swing>=15&&!b.poor, svag=!klar&&b.swing!=null&&b.swing>=10;
+  const flere=b.others&&b.others.length>0;
+  const klar=!flere&&b.swing!=null&&b.swing>=15&&!b.poor, svag=!klar&&!flere&&b.swing!=null&&b.swing>=10;
   let t='<b>Pejling '+(b.n||'')+'</b><br>';
-  if(b.center!=null) t+='Retning '+Math.round(b.center)+'° (midten af den brede top).<br>Niveauet svingede '+tal(b.swing)+' dB fra den kraftigste til den svageste retning. '+(klar?'Tydelig retning.':svag?'Svag retning.':'Ingen tydelig retning, stregen er ikke til at stole på.');
+  if(flere) t+='Signalet kom næsten lige stærkt fra flere retninger: '+[b.center].concat(b.others).map(g=>Math.round(g)+'°').join(', ')+'. Det er et tegn på genskin fra noget stort i nærheden, og ingen af retningerne kan stoles på alene.';
+  else if(b.center!=null) t+='Retning '+Math.round(b.center)+'° (midten af den brede top).<br>Niveauet svingede '+tal(b.swing)+' dB fra den kraftigste til den svageste retning. '+(klar?'Tydelig retning.':svag?'Svag retning.':'Ingen tydelig retning, stregen er ikke til at stole på.');
   else t+='Retning '+Math.round(retning(b))+'°. Der er ikke drejet nok rundt på stedet til at vurdere, hvor sikker den er.';
   if(b.poor) t+=' Kompasset var usikkert.';
   if(b.best!=null&&b.center!=null&&Math.abs(((b.best-b.center+540)%360)-180)>=8) t+='<br>Appen viste '+Math.round(b.best)+'° som den ene stærkeste retning.';

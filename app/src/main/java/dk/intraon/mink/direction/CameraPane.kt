@@ -309,17 +309,29 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
      * Appen har selv gemt en pejling for et sted, brugeren har forladt: fortæl det, og gem fotoet fra stedets
      * stærkeste måling, hvis det blev holdt. Kaldes, hver gang noget har ændret sig; gør kun noget én gang pr. pejling.
      */
+    /** "248°, 123° og 330°": toppens midte og de andre retninger. */
+    private fun degrees(l: Lobe): String {
+        val all = (listOf(l.center) + l.others).map { "${it.roundToInt()}°" }
+        return if (all.size == 1) all[0] else all.dropLast(1).joinToString(", ") + " og " + all.last()
+    }
+
+    /** "stærkest 248° VSV", eller "flere retninger: 248°, 123° og 330°", når signalet kommer lige stærkt fra flere sider. */
+    private fun strongest(l: Lobe): String =
+        if (l.several) "flere retninger: ${degrees(l)}" else "stærkest ${l.center.roundToInt()}° ${Bearing.name(l.center)}"
+
     fun autoSaved() {
         val ab = Hub.autoBearing ?: return
         if (ab === handled) return
         handled = ab
         val best = ab.stop.best
-        val what = "Stedets stærkeste retning ${best.roundToInt()}° ${Bearing.name(best)}"
+        // kom signalet lige stærkt fra flere sider, er det genskin, og så skal ingen af retningerne stå alene
+        val what = if (ab.stop.lobe.several) "Stedet har flere retninger (${degrees(ab.stop.lobe)}), sandsynligvis genskin. Det"
+        else "Stedets stærkeste retning ${best.roundToInt()}° ${Bearing.name(best)}"
         val shot = held.firstOrNull { it.at == ab.stop.at }
         if (ab.photo == null || shot == null || width == 0) { a.toast("$what er gemt som pejling på kortet"); return }
         held.remove(shot)
-        val level = "niveau ${Ui.f1(ab.stop.level)} dB"
-        savePhoto(ab.photo, shot.frame, shot.hdg, shot.tilt, Date(shot.at), Shot(ab.stop.rose, "stedets stærkeste måling · $level"), "stærkest ${best.roundToInt()}° ${Bearing.name(best)} · $level") { ok ->
+        val level = "niveau ${Ui.f1(ab.stop.lobe.top)} dB"
+        savePhoto(ab.photo, shot.frame, shot.hdg, shot.tilt, Date(shot.at), Shot(ab.stop.rose, "taget i stedets stærkeste retning · $level"), "${strongest(ab.stop.lobe)} · $level") { ok ->
             a.toast(if (ok) "$what er gemt som pejling på kortet og som foto i galleriet" else "$what er gemt som pejling på kortet (fotoet kunne ikke gemmes)")
         }
     }
@@ -421,8 +433,8 @@ class CameraPane(private val a: MainActivity) : FrameLayout(a) {
             val tip = Path().apply { moveTo(cx, cy - rr - 2 * d); lineTo(cx - 9 * d, cy - rr + 18 * d); lineTo(cx + 9 * d, cy - rr + 18 * d); close() }
             c.drawPath(tip, p)
             p.textSize = 13 * d
-            val best = rose.best()
-            c.drawText(if (best != null) "▼ stærkest ${best.roundToInt()}° ${Bearing.name(best)}" else "drej langsomt rundt – ét udbrud pr. retning", cx, lay.bestY, p)
+            val lobe = rose.lobe()
+            c.drawText(if (lobe != null) "▼ ${strongest(lobe)}" else "drej langsomt rundt – ét udbrud pr. retning", cx, lay.bestY, p)
             val n = Hub.bearings.size
             p.textAlign = Paint.Align.LEFT; p.color = 0xB0FFFFFF.toInt(); p.textSize = 12 * d
             c.drawText(if (n == 0) "ingen pejlinger gemt" else "$n ${if (n == 1) "pejling" else "pejlinger"} gemt", 12 * d, lay.countY, p)
