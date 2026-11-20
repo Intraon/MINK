@@ -69,6 +69,7 @@ Vandfaldet er genskabt fra turens log. Hvert udbrud står på sin frekvens og si
 - Træk i vandfaldet for at gå frem og tilbage i tiden. Det seneste er øverst, som i det levende vandfald.
 - Kurven øverst er målets niveau over hele turen. Tryk et sted på den for at springe derhen.
 - Knappen med afstanden skifter mellem **overblik** (fem minutter på en skærm), **normal** (som det levende vandfald) og **tæt på** (et udbrud fylder en finger). I normal og tæt på vises udbruddets ægte signal fra turens bølgeform; uden bølgeform er hvert udbrud et felt farvet efter styrken. Linjen under vandfaldet siger, hvad udbruddene er tegnet af, og om bølgeformen mangler eller ikke kunne læses.
+- Øverst i vandfaldet står frekvensen i MHz over hver kanal, der har udbrud i billedet. Ligger kanalerne tæt, står tallene i to rækker.
 - På kortet viser et sigtekorn, hvor du var på det klokkeslæt, vandfaldet står på.
 - **Billede** gemmer vandfaldet, som du ser det, med tur, klokkeslæt og mål skrevet under. Billedet følger med, når den tur deles.
 - **✕** lukker turen og viser det levende vandfald igen.
