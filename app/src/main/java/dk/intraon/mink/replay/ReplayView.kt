@@ -118,7 +118,9 @@ class ReplayView(ctx: Context, private val onTime: (Long) -> Unit) : View(ctx) {
             c.drawRect(xOf(chan - chanBw / 2, r), top, xOf(chan + chanBw / 2, r), h, p)
         }
         val detail = detailed && clips != null
+        val seen = ArrayList<Double>()
         for (b in r.between(t - ((h - top) * msPerPx).toLong() - 1_000, t + 1_000)) {
+            seen.add(b.freqHz)
             val bmp = if (detail) clips?.get(b) else null
             if (bmp != null) {
                 val from = b.t - b.iqPreMs
@@ -131,19 +133,48 @@ class ReplayView(ctx: Context, private val onTime: (Long) -> Unit) : View(ctx) {
                 c.drawRect(xOf(b.freqHz - b.bwHz / 2, r), y0, max(xOf(b.freqHz + b.bwHz / 2, r), xOf(b.freqHz - b.bwHz / 2, r) + 2 * d), y1, p)
             }
         }
+        val strip = drawChannels(c, r, seen, w)
         // klokkeslæt langs venstre kant
         val step = when (msPerPx) { STEPS[0] -> 1_000L; STEPS[1] -> 5_000L; else -> 60_000L }
         p.textSize = 11 * d; p.textAlign = Paint.Align.LEFT
         var mark = t / step * step
         while (yOf(mark) < h) {
             val y = yOf(mark)
-            if (y > top + 12 * d) {
+            if (y > top + max(12 * d, strip + 13 * d)) {
                 p.color = 0x50FFFFFF; c.drawRect(0f, y, 10 * d, y + d, p)
                 p.color = 0xD0FFFFFF.toInt(); c.drawText(clock.format(Date(mark)), 4 * d, y - 3 * d, p)
             }
             mark -= step
         }
         c.restore()
+    }
+
+    /**
+     * Skriver frekvensen over hver kanal, der har udbrud i billedet, på et mørkt bånd øverst i vandfaldet: aksen har
+     * kun et tal for hver 100 kHz, og kanalerne ligger tættere end det. Mærker, der ville dække hinanden, står i to
+     * rækker ([Channels.rows]). Returnerer båndets højde, 0 uden udbrud.
+     */
+    private fun drawChannels(c: Canvas, r: Replay, freqs: List<Double>, w: Float): Float {
+        val chans = Channels.of(freqs)
+        p.textSize = 10.5f * d; p.textAlign = Paint.Align.CENTER
+        val width = p.measureText("869,000") + 6 * d
+        val xs = chans.map { xOf(it, r).coerceIn(width / 2, w - width / 2) }
+        val rows = Channels.rows(xs, width)
+        val used = (rows.maxOrNull() ?: -1) + 1
+        if (used == 0) return 0f
+        val rowH = 15 * d; val height = used * rowH + 4 * d
+        p.style = Paint.Style.FILL; p.color = 0xD00E0F12.toInt()
+        c.drawRect(0f, top, w, top + height, p)
+        for (i in chans.indices) {
+            if (rows[i] < 0) continue
+            p.color = 0xFFFFFFFF.toInt()
+            c.drawText(String.format(Ui.DA, "%.3f", chans[i] / 1e6), xs[i], top + rows[i] * rowH + 12 * d, p)
+            // en lille streg ned mod kanalen, så mærket i øverste række ikke forveksles med naboens
+            p.color = 0x90FFFFFF.toInt()
+            c.drawRect(xOf(chans[i], r) - d / 2, top + (rows[i] + 1) * rowH, xOf(chans[i], r) + d / 2, top + height, p)
+        }
+        p.textAlign = Paint.Align.LEFT
+        return height
     }
 
     /** Målets niveau over hele turen, med en streg dér, hvor vandfaldet står. */
