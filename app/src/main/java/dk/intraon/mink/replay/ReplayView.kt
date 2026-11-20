@@ -71,10 +71,10 @@ class ReplayView(ctx: Context, private val onTime: (Long) -> Unit) : View(ctx) {
         moveTo(t)
     }
 
-    /** Hvad den aktuelle afstand viser, til knappen. */
     /** Er der zoomet så langt ind, at udbruddets eget signal kan ses? */
     val detailed: Boolean get() = msPerPx <= STEPS[1]
 
+    /** Hvad den aktuelle afstand viser, til knappen. */
     fun zoomName(): String = when (msPerPx) { STEPS[0] -> "tæt på"; STEPS[1] -> "normal"; else -> "overblik" }
 
     /** Målets niveau ved tidspunktet [at]: den nærmeste måling inden for et udbruds afstand. */
