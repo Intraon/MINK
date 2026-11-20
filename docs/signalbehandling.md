@@ -101,6 +101,8 @@ En positiv PPM-korrektion flytter signalerne opad i vandfaldet. Den nye korrekti
 
 **Krydspejlingen** (`Crossing`) er det punkt, der ligger tættest på pejlingernes linjer. Hver pejling vejes med én over kvadratet på den fejl i meter, den typisk har ved punktet: afstanden gange 10°. En nær pejling bestemmer derfor mere end en fjern. Kun steder med én retning og et udsving på mindst 10 dB regnes med (en pejling uden omgang tæller også), og flere pejlinger inden for 30 meter er ét sted. Peger en pejling mere end 30° ved siden af punktet, tages den ud, og der regnes om; er der kun to tilbage, og de ikke mødes foran de steder, de er taget fra, er der intet punkt. Det er der heller ikke, når ingen to pejlinger krydser med mindst 20°. Usikkerheden er en ellipse regnet af de samme vægte og tegnet to gange så stor som den typiske fejl.
 
+Kortet i appen og kortfilen læser en turs pejlinger af loggen på samme måde (`LogReading`), så de viser de samme retninger og det samme anslåede sted. Retningen er toppen i målets målinger fra de sidste fem minutter før pejlingen, taget inden for 30 meter, mens telefonen stod stille. Den retning, der blev skrevet i loggen, da pejlingen blev gemt, bruges kun, når der ikke er drejet nok på stedet.
+
  Rosetten begynder forfra, når man har flyttet sig 15 meter eller vælger nyt mål.
 
 **I kamerabilledet** ligger en retning `tan(forskel) / tan(synsfelt / 2) × halv billedbredde` fra midten (`Bearing.offsetPx`). Synsfeltet regnes ud fra kameraets sensorstørrelse og brændvidde.

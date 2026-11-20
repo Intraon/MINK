@@ -240,8 +240,8 @@ class PointsOverlay(private val d: Float) : Overlay() {
 
     /**
      * Krydspejlingen af de pejlinger, kortet viser: det anslåede sted som et sigtemærke, og om det en ellipse, som
-     * senderen sandsynligvis ligger inden for. En pejling, der blev taget, uden at målet blev hørt, regnes ikke med.
-     * Der tegnes intet, når pejlingerne ikke giver et sted ([Crossing.of]).
+     * senderen sandsynligvis ligger inden for. Der tegnes intet, når pejlingerne ikke giver et sted
+     * ([MapData.crossing]).
      */
     private fun drawCrossing(c: Canvas, mv: Projection) {
         val all = bearings().flatten()
@@ -249,9 +249,7 @@ class PointsOverlay(private val d: Float) : Overlay() {
         val stamp = all.fold(17L) { h, b -> h * 31 + b.t + (b.deg * 10).toLong() }
         if (stamp != crossingStamp) {
             crossingStamp = stamp
-            crossing = Crossing.of(all.mapNotNull { b ->
-                if (b.level == null) null else Crossing.Sight(b.lat ?: return@mapNotNull null, b.lon ?: return@mapNotNull null, b.deg, b.swing, b.others.isNotEmpty())
-            })
+            crossing = MapData.crossing(all)
         }
         val at = crossing ?: return
         area.rewind()

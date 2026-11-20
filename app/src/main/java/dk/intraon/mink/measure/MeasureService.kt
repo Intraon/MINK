@@ -650,7 +650,7 @@ class MeasureService : Service() {
         val loc = freshLocation()
         val last = Hub.lastBurst?.takeIf { now - it.t < 6_000 }
         val n = Hub.bearings.size + 1
-        Hub.bearings.add(Hub.BearingLine(now, loc?.latitude, loc?.longitude, deg, last?.level, n))
+        Hub.bearings.add(Hub.BearingLine(now, loc?.latitude, loc?.longitude, deg, last?.level, n, poor = Hub.compassPoor))
         val o = JSONObject().put("type", "bearing").put("t", iso(now))
         putLocation(o, loc, false)
         o.put("hdg", r1(deg)).put("tilt", r1(Hub.tiltDeg)).put("lvl", last?.level?.let { r1(it) } ?: JSONObject.NULL)

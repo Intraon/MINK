@@ -1,7 +1,6 @@
 package dk.intraon.mink.trip
 
 import dk.intraon.mink.direction.Crossing
-import dk.intraon.mink.direction.Lobe
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.OffsetDateTime
@@ -118,65 +117,34 @@ object MapPage {
     }
 
     private fun trip(log: Log): Trip? {
-        val recs = log.lines.mapNotNull { try { JSONObject(it) } catch (_: Exception) { null } }
-        val times = HashMap<JSONObject, OffsetDateTime>()
-        for (o in recs) if (o.has("t")) try { times[o] = OffsetDateTime.parse(o.getString("t")) } catch (_: Exception) {}
-        fun t(o: JSONObject) = times[o]?.let { it.toInstant().toEpochMilli() / 1000.0 }
-        val timed = recs.filter { it in times }
+        val read = LogReading.of(log.lines)
+        val recs = read.recs; val kept = read.kept
+        fun t(o: JSONObject) = read.t(o)
+        val timed = recs.filter { read.timed(it) }
         if (timed.isEmpty()) return null
         val t0 = t(timed.first())!!; val t1 = t(timed.last())!!
         val id = recs.firstOrNull { it.optString("type") == "meta" }?.optString("session")?.takeIf { it.isNotEmpty() } ?: TripFiles.stamp(log.name) ?: log.name
         fun placed(o: JSONObject) = !o.isNull("lat") && !o.isNull("lon")
 
-        // Målets målinger. Skiftede målet undervejs, vises kun den sender, der var mål i flest målinger.
-        var hits = recs.filter { it.optString("type") == "burst" && it in times && !it.isNull("lvl") && (!it.has("src") || it.optBoolean("tgt")) }
-        val main = hits.groupingBy { it.optInt("src", 0) }.eachCount().maxByOrNull { it.value }?.key
-        hits = hits.filter { it.optInt("src", 0) == main }
-        // Er der skruet på gain i hånden, bruges kun målingerne ved turens sædvanlige gain: niveauet følger ikke
-        // altid med, når der skrues, og så kan de øvrige ikke sammenlignes med resten.
-        val gains = recs.filter { it.optString("type") == "gain" && it in times }
-        if (gains.any { it.optString("why") == "manuel" }) {
-            val usual = hits.groupingBy { it.optDouble("gain") }.eachCount().maxByOrNull { it.value }?.key
-            hits = hits.filter { it.optDouble("gain") == usual }
-        }
-        val gainTimes = gains.map { t(it)!! }
-        // Lige efter et gain-skift er effekten målt med det gamle gain, og et enkelt hop på over 20 dB i forhold til
-        // målingerne lige før og efter, mens telefonen står stille, er et andet signal oven i målet.
-        val kept = hits.filterIndexed { i, o ->
-            val at = t(o)!!
-            if (gainTimes.any { at - it in -0.5..3.0 }) return@filterIndexed false
-            if (o.optDouble("spd", 0.0) > 5) return@filterIndexed true
-            val near = (hits.subList(maxOf(0, i - 2), i) + hits.subList(i + 1, minOf(hits.size, i + 3))).filter { kotlin.math.abs(t(it)!! - at) <= 13 }
-            !(near.size >= 2 && near.all { o.getDouble("lvl") - it.getDouble("lvl") > 20 })
-        }
         val target = kept.filter { placed(it) }.map { o ->
             JSONArray().put(r6(o.getDouble("lat"))).put(r6(o.getDouble("lon"))).put(r1(o.getDouble("lvl"))).put((t(o)!! - t0).roundToLong())
                 .put(r1(o.optDouble("snr", 0.0))).put(o.optDouble("spd", 0.0).let { if (it.isNaN()) 0 else it.roundToInt() })
         }
         // tb = målinger fra målet i perioden; mangler feltet (ældre logge), er perioden stille, når intet blev målt
         val quiet = recs.filter { o ->
-            o.optString("type") == "tick" && o in times && placed(o) &&
+            o.optString("type") == "tick" && read.timed(o) && placed(o) &&
                 (if (o.has("tb")) (!o.isNull("tb") && o.optInt("tb") == 0) else o.optInt("bursts", 1) == 0)
         }.map { o -> JSONArray().put(r6(o.getDouble("lat"))).put(r6(o.getDouble("lon"))).put((t(o)!! - t0).roundToLong()) }
 
-        val bearings = recs.filter { it.optString("type") == "bearing" && it in times && placed(it) }.map { o ->
-            val at = t(o)!!; val lat = o.getDouble("lat"); val lon = o.getDouble("lon")
-            // drejningen på stedet: målingerne, mens telefonen stod stille her de sidste fem minutter før pejlingen
-            val turn = kept.filter { x ->
-                placed(x) && !x.isNull("hdg") && !x.optBoolean("hdg_poor") && t(x)!! in (at - 300)..(at + 5) &&
-                    x.optDouble("spd", 0.0) < 2 && meters(x.getDouble("lat"), x.getDouble("lon"), lat, lon) <= 30
-            }.map { it.getDouble("hdg") to it.getDouble("lvl") }
-            val lobe = Lobe.of(turn)
-            JSONObject().put("lat", lat).put("lon", lon).put("t", (at - t0).roundToLong()).put("n", o.optInt("n"))
-                .put("hdg", if (o.isNull("hdg")) JSONObject.NULL else o.getDouble("hdg"))
-                .put("best", if (o.isNull("best") || !o.has("best")) JSONObject.NULL else o.getDouble("best"))
-                .put("lvl", if (o.isNull("lvl") || !o.has("lvl")) JSONObject.NULL else o.getDouble("lvl"))
-                .put("poor", o.optString("cmp") == "poor").put("auto", o.optBoolean("auto"))
-                .put("photo", if (o.isNull("photo") || !o.has("photo")) JSONObject.NULL else o.getString("photo").substringAfterLast('/'))
-                .put("center", lobe?.let { r1(it.center) } ?: JSONObject.NULL).put("swing", lobe?.let { r1(it.swing) } ?: JSONObject.NULL)
-                .put("others", JSONArray(lobe?.others?.map { r1(it) } ?: emptyList<Double>()))
+        // pejlingerne med den retning, drejningen på stedet giver; kortet i appen læser dem på samme måde
+        val bearings = read.sightings.map { b ->
+            JSONObject().put("lat", b.lat).put("lon", b.lon).put("t", (b.at - t0).roundToLong()).put("n", b.n)
+                .put("hdg", b.hdg ?: JSONObject.NULL).put("best", b.best ?: JSONObject.NULL).put("lvl", b.level ?: JSONObject.NULL)
+                .put("poor", b.poor).put("auto", b.auto).put("photo", b.photo ?: JSONObject.NULL)
+                .put("center", b.lobe?.let { r1(it.center) } ?: JSONObject.NULL).put("swing", b.swing?.let { r1(it) } ?: JSONObject.NULL)
+                .put("others", JSONArray(b.others.map { r1(it) }))
         }
-        val marks = recs.filter { it.optString("type") == "mark" && it in times && placed(it) }.map { o ->
+        val marks = recs.filter { it.optString("type") == "mark" && read.timed(it) && placed(it) }.map { o ->
             JSONObject().put("lat", o.getDouble("lat")).put("lon", o.getDouble("lon")).put("t", (t(o)!! - t0).roundToLong())
                 .put("n", o.optInt("n")).put("kind", o.optString("kind", "mark"))
         }
@@ -188,7 +156,7 @@ object MapPage {
         val a0 = where.first().getDouble("lat"); val o0 = where.first().getDouble("lon")
         val spread = where.maxOf { meters(it.getDouble("lat"), it.getDouble("lon"), a0, o0) }
         val kind = if (fast) "bil" else if (spread > STILL_M) "til fods" else "stille"
-        return Trip(id, t0, t1, times[timed.first()]!!.offset.totalSeconds, kind, target, quiet, bearings, marks)
+        return Trip(id, t0, t1, read.time(timed.first())!!.offset.totalSeconds, kind, target, quiet, bearings, marks)
     }
 
     private fun median(v: List<Double>): Double { val s = v.sorted(); return if (s.size % 2 == 1) s[s.size / 2] else (s[s.size / 2 - 1] + s[s.size / 2]) / 2 }
