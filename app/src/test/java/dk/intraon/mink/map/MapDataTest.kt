@@ -2,7 +2,11 @@ package dk.intraon.mink.map
 
 import dk.intraon.mink.core.Hub
 import dk.intraon.mink.core.MarkKind
+import dk.intraon.mink.direction.Bearing
+import dk.intraon.mink.trip.MapPage
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MapDataTest {
@@ -17,6 +21,34 @@ class MapDataTest {
         val marks = MapData.parse(listOf(log)).marks
         assertEquals("et mærke uden position kan ikke stå på kortet", listOf(1, 2, 3, 4), marks.map { it.n })
         assertEquals(listOf(MarkKind.PLAIN, MarkKind.POSSIBLE, MarkKind.FOUND, MarkKind.PLAIN), marks.map { it.kind })
+    }
+
+    @Test fun kortetIAppenOgKortfilenAnslaarSammeStedOgsaaNaarLoggenSkrevEnAndenRetning() {
+        // en opdigtet sender og to steder tre kilometer fra den; på hvert sted en hel omgang med toppen mod senderen
+        val txLat = 55.0; val txLon = 10.0
+        val lines = ArrayList<String>()
+        lines.add("""{"type":"meta","session":"20261117_120000"}""")
+        fun clock(sec: Int) = "2026-11-17T12:%02d:%02d.000+01:00".format(sec / 60, sec % 60)
+        for ((k, fromTx) in listOf(40.0, 130.0).withIndex()) {
+            val (lat, lon) = Bearing.destination(txLat, txLon, fromTx, 3_000.0)
+            val toTx = Bearing.norm(fromTx + 180)
+            for (i in 0 until 40) {
+                val hdg = i * 9.0
+                val lvl = -60.0 - minOf(kotlin.math.abs(Bearing.diff(hdg, toTx)), 90.0) / 90 * 20
+                lines.add("""{"type":"burst","t":"${clock(k * 600 + i * 4)}","lat":$lat,"lon":$lon,"spd":0,"f":"869.6000","src":1,"tgt":true,"snr":15,"lvl":$lvl,"gain":29.7,"dur":350,"hdg":$hdg}""")
+            }
+            // loggen har den ene kraftigste måling som retning, 25° ved siden af toppens midte, og intet udsving
+            lines.add("""{"type":"bearing","t":"${clock(k * 600 + 170)}","lat":$lat,"lon":$lon,"hdg":${Bearing.norm(toTx + 25)},"best":${Bearing.norm(toTx + 25)},"lvl":-60.0,"n":${k + 1},"auto":true,"photo":null}""")
+        }
+
+        val inApp = MapData.crossing(MapData.parse(listOf(lines)).bearings)!!
+        val inFile = JSONObject(MapPage.crossing(MapPage.data(listOf(MapPage.Log("mink_20261117_120000.jsonl.txt", lines)))))
+
+        // kortfilen har retningerne med én decimal, så de to steder kan ligge et par meter fra hinanden
+        val apart = Bearing.meters(inApp.lat, inApp.lon, inFile.getDouble("lat"), inFile.getDouble("lon"))
+        assertTrue("de to kort lå $apart m fra hinanden", apart < 5)
+        val miss = Bearing.meters(inApp.lat, inApp.lon, txLat, txLon)
+        assertTrue("stedet lå $miss m fra senderen: retningen skal være toppens midte, ikke den, loggen skrev", miss < 200)
     }
 
     @Test fun maaletsFrekvensErDenMidtersteOgIkkeDenFoersteMaaling() {

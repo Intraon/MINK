@@ -32,10 +32,11 @@ object Hub {
      * En gemt pejling: herfra, i den retning, med det niveau (null = intet hørt, da den blev taget). For et sted,
      * der er målt en omgang rundt, er [swing] forskellen i dB mellem den stærkeste og den svageste retning, og
      * [others] er andre retninger, der var næsten lige så stærke (genskin). Null og tom for en pejling uden omgang.
+     * [poor] = kompasset var usikkert, da den blev taget.
      */
     data class BearingLine(
         val t: Long, val lat: Double?, val lon: Double?, val deg: Double, val level: Double?, val n: Int,
-        val swing: Double? = null, val others: List<Double> = emptyList(),
+        val swing: Double? = null, val others: List<Double> = emptyList(), val poor: Boolean = false,
     )
 
     @Volatile var running = false

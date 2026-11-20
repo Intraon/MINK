@@ -4,6 +4,9 @@ import android.content.Context
 import android.net.Uri
 import dk.intraon.mink.core.Hub
 import dk.intraon.mink.core.MarkKind
+import dk.intraon.mink.direction.Crossing
+import dk.intraon.mink.trip.LogReading
+import dk.intraon.mink.trip.MapPage
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
@@ -61,12 +64,11 @@ object MapData {
                     // tb = målinger fra målet; null = intet mål var valgt, og så er der ikke noget "stille"
                     "tick" -> if (if (o.has("tb")) (!o.isNull("tb") && o.optInt("tb") == 0) else o.optInt("bursts", 1) == 0) s.add(Hub.Point(time(o), lat, lon, null, null, null, 0, o.optDouble("gain", 0.0)))
                     "mark" -> m.add(Hub.Mark(time(o), lat, lon, o.optInt("n"), MarkKind.of(o.optString("kind"))))
-                    "bearing" -> if (!o.isNull("hdg")) br.add(Hub.BearingLine(
-                        time(o), lat, lon, o.getDouble("hdg"), if (o.isNull("lvl")) null else o.optDouble("lvl"), o.optInt("n"),
-                        if (o.has("swing") && !o.isNull("swing")) o.getDouble("swing") else null,
-                        o.optJSONArray("others")?.let { a -> (0 until a.length()).map { a.getDouble(it) } } ?: emptyList(),
-                    ))
                 }
+            }
+            // pejlingerne læses som i kortfilen: retningen regnes af drejningen på stedet, ikke af det, loggen skrev
+            for (g in LogReading.of(lines).sightings) {
+                br.add(Hub.BearingLine((g.at * 1000).toLong(), g.lat, g.lon, g.deg ?: continue, g.level, g.n, g.swing, g.others, g.poor))
             }
             // skiftede målet undervejs i turen, vises kun den sender, der var mål i flest målinger
             val mine = (fileStart until b.size).toList()
@@ -75,6 +77,15 @@ object MapData {
         }
         return TripPoints(b, s, m, br)
     }
+
+    /**
+     * Krydspejlingen af [bearings]: det sted, de peger på tilsammen. En pejling taget med et usikkert kompas, uden
+     * position, eller uden at målet blev hørt, regnes ikke med. Kortfilen bruger samme regel ([MapPage.crossing]).
+     */
+    fun crossing(bearings: List<Hub.BearingLine>): Crossing? = Crossing.of(bearings.mapNotNull { b ->
+        if (b.poor || b.level == null) null
+        else Crossing.Sight(b.lat ?: return@mapNotNull null, b.lon ?: return@mapNotNull null, b.deg, b.swing, b.others.isNotEmpty())
+    })
 
     /** Niveau-skalaen for alt, der vises: indlæste ture og den tur, der kører. */
     fun range(): Pair<Double, Double>? {
