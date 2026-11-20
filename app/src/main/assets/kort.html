@@ -60,6 +60,7 @@ input[type=range]{width:100%}
 <div id="kilde"></div>
 <script>
 const DATA = /*DATA*/;
+const KRYDS = /*KRYDS*/;
 const BASE = /*BASE*/;
 const FOTO = /*FOTO*/;
 // Farveskalaen følger filens egne målinger: fra den svageste til den kraftigste, dog mindst 20 dB.
@@ -283,6 +284,17 @@ function gengiv(){
       mål.push(Object.assign(r,{cx:p[0],cy:p[1],åbn:()=>pop(m.lat,m.lon,'<b>Mærke '+(m.n||'')+'</b>'+(m.kind==='possible'?' (mulig kilde)':m.kind==='found'?' (kilde fundet)':'')+'<br>'+tid(d.t0+m.t,d.off)+'<br>'+d.label)}));
     }
   }
+  // Krydspejlingen er regnet af pejlingerne fra alle filens ture, så den vises kun, når de alle er slået til.
+  if(KRYDS&&$('l-pejl').checked&&tilstand.ture.size===DATA.length){
+    ctx.beginPath(); KRYDS.outline.forEach((q,i)=>{ const p=punkt(q[0],q[1]); i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]); }); ctx.closePath();
+    // lyst oven på kilerne, så området kan ses, hvor de ligger tæt
+    ctx.fillStyle='#fff'; ctx.globalAlpha=0.45; ctx.fill(); ctx.globalAlpha=1; ctx.strokeStyle='#fff'; ctx.lineWidth=5; ctx.stroke(); ctx.strokeStyle=LILLA; ctx.lineWidth=2.5; ctx.setLineDash([7,5]); ctx.stroke(); ctx.setLineDash([]);
+    const c=punkt(KRYDS.lat,KRYDS.lon);
+    ctx.beginPath(); ctx.arc(c[0],c[1],8,0,7); ctx.fillStyle='#fff'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle=LILLA; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(c[0]-13,c[1]); ctx.lineTo(c[0]+13,c[1]); ctx.moveTo(c[0],c[1]-13); ctx.lineTo(c[0],c[1]+13); ctx.lineWidth=2; ctx.stroke();
+    const r=mærkat('Anslået sted',c[0]+14,c[1]+18,LILLA);
+    mål.push(Object.assign(r,{cx:c[0],cy:c[1],åbn:visKryds}));
+  }
   gemt={x:vis.x,y:vis.y,z:vis.z};
 }
 function tegn(){
@@ -305,6 +317,14 @@ $('stor').onclick=()=>{ $('stor').style.display='none'; };
 function visMåling(p){
   pop(p.lat,p.lon,(p.lvl==null?'<b>Stille</b><br>Målet blev ikke hørt i 10 sekunder.':'<b>'+tal(p.lvl)+' dB</b>'+(p.snr!=null?' · '+tal(p.snr)+' dB over støjen':''))+
     '<br>'+tid(p.t,p.tur.off)+(p.spd!=null?' · '+p.spd+' km/t':'')+'<br>'+p.tur.label+'<br><span class="lille">'+p.lat.toFixed(5)+', '+p.lon.toFixed(5)+'</span>');
+}
+function længde(m){ return m>=1000?tal(m/1000)+' km':Math.round(m/10)*10+' m'; }
+function visKryds(){
+  let t='<b>Anslået sted</b><br>Her mødes '+KRYDS.n+' pejlinger bedst. Senderen ligger sandsynligvis inden for det skraverede område, som er '+længde(2*KRYDS.a)+' langt og '+længde(2*KRYDS.b)+' bredt.';
+  if(KRYDS.a>3*KRYDS.b) t+='<br>Området er langt, fordi pejlingerne er taget fra næsten samme side. En pejling fra en anden side gør det kortere.';
+  if(KRYDS.left>0) t+='<br>'+(KRYDS.left===1?'Én pejling pegede':KRYDS.left+' pejlinger pegede')+' et helt andet sted hen og er ikke regnet med.';
+  t+='<br>Steder med flere retninger og steder uden tydelig retning er heller ikke med. En pejling vejer tungere, jo tættere på den er taget.';
+  pop(KRYDS.lat,KRYDS.lon,t+'<br><span class="lille">'+KRYDS.lat.toFixed(5)+', '+KRYDS.lon.toFixed(5)+'</span>');
 }
 function visPejling(b,d){
   const flere=b.others&&b.others.length>0;
@@ -368,6 +388,8 @@ $('om').textContent='Sporet er farvet efter målets niveau, og hvor ruten går s
 
 tilpas();
 const alle=[]; DATA.forEach(d=>{ d.target.forEach(r=>alle.push([r[0],r[1]])); d.quiet.forEach(r=>alle.push([r[0],r[1]])); d.bearings.forEach(b=>alle.push([b.lat,b.lon])); });
+// det anslåede sted ligger sjældent, hvor der er målt: kortet skal også rumme det
+if(KRYDS) KRYDS.outline.forEach(q=>alle.push(q));
 visOmråde(alle,[60,30,panel.classList.contains('lukket')?30:360,40]);
 opdatér();
 </script>

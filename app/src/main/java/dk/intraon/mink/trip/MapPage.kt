@@ -1,5 +1,6 @@
 package dk.intraon.mink.trip
 
+import dk.intraon.mink.direction.Crossing
 import dk.intraon.mink.direction.Lobe
 import org.json.JSONArray
 import org.json.JSONObject
@@ -84,12 +85,35 @@ object MapPage {
     }
 
     /**
+     * Krydspejlingen af alle pejlingerne i [data] (turenes data, som [data] laver dem) til kortfilen: stedet,
+     * ellipsens omrids og tallene til teksten. "null", når pejlingerne ikke giver et sted. En pejling taget med et
+     * usikkert kompas, eller uden at målet blev hørt, regnes ikke med.
+     */
+    fun crossing(data: String): String {
+        val sights = ArrayList<Crossing.Sight>()
+        val trips = JSONArray(data)
+        for (i in 0 until trips.length()) {
+            val list = trips.getJSONObject(i).getJSONArray("bearings")
+            for (j in 0 until list.length()) {
+                val b = list.getJSONObject(j)
+                if (b.optBoolean("poor") || b.isNull("lvl")) continue
+                val deg = listOf("center", "best", "hdg").firstOrNull { !b.isNull(it) }?.let { b.getDouble(it) } ?: continue
+                sights.add(Crossing.Sight(b.getDouble("lat"), b.getDouble("lon"), deg, if (b.isNull("swing")) null else b.getDouble("swing"), b.getJSONArray("others").length() > 0))
+            }
+        }
+        val c = Crossing.of(sights) ?: return "null"
+        return JSONObject().put("lat", r6(c.lat)).put("lon", r6(c.lon)).put("n", c.used).put("left", c.left)
+            .put("a", c.majorM.roundToInt()).put("b", c.minorM.roundToInt())
+            .put("outline", JSONArray(c.outline().map { JSONArray().put(r6(it.first)).put(r6(it.second)) })).toString()
+    }
+
+    /**
      * Sætter kortfilen sammen af skabelonen, turenes data, baggrundskortet (null = intet kunne hentes) og fotoerne
      * (navn til JPEG som base64). [made] er tidspunktet, filen blev lavet, som det skal stå i filen.
      */
     fun html(template: String, data: String, base: String?, photos: Map<String, String>, made: String): String {
         fun safe(json: String) = json.replace("</", "<\\/")
-        return template.replace("/*DATA*/", safe(data)).replace("/*BASE*/", safe(base ?: "null"))
+        return template.replace("/*DATA*/", safe(data)).replace("/*KRYDS*/", safe(crossing(data))).replace("/*BASE*/", safe(base ?: "null"))
             .replace("/*FOTO*/", safe(JSONObject(photos).toString())).replace("{{LAVET}}", made)
     }
 

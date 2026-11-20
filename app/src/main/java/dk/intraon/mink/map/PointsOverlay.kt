@@ -9,6 +9,7 @@ import android.graphics.Shader
 import dk.intraon.mink.core.Hub
 import dk.intraon.mink.core.MarkKind
 import dk.intraon.mink.direction.Bearing
+import dk.intraon.mink.direction.Crossing
 import dk.intraon.mink.ui.Ui
 import kotlin.math.max
 import org.osmdroid.util.GeoPoint
@@ -18,7 +19,7 @@ import org.osmdroid.views.overlay.Overlay
 /** Så lang tegnes en pejling på kortet (meter). */
 private const val BEARING_M = 8_000.0
 /** Så mange grader til hver side er en pejling usikker: fjerne pejlinger gennem bebyggelse rammer ca. 10° ved siden af. */
-private const val WEDGE_DEG = 10.0
+private const val WEDGE_DEG = Crossing.MISS_DEG
 /** Et sted har en tydelig retning, når niveauet svinger mindst så mange dB en omgang rundt. */
 private const val CLEAR_DB = 10.0
 /** Farven på spor og felter, hvor der blev lyttet uden at høre målet. */
@@ -54,6 +55,9 @@ class PointsOverlay(private val d: Float) : Overlay() {
     private var gridStamp = -1L
     private var pieces: List<Track.Piece> = emptyList()
     private var piecesStamp = -1L
+    private var crossing: Crossing? = null
+    private var crossingStamp = -1L
+    private val area = Path()
 
     override fun draw(c: Canvas, mv: Projection) {
         if (heat) drawHeat(c, mv) else drawTrack(c, mv)
@@ -234,8 +238,53 @@ class PointsOverlay(private val d: Float) : Overlay() {
         }
     }
 
+    /**
+     * Krydspejlingen af de pejlinger, kortet viser: det anslåede sted som et sigtemærke, og om det en ellipse, som
+     * senderen sandsynligvis ligger inden for. En pejling, der blev taget, uden at målet blev hørt, regnes ikke med.
+     * Der tegnes intet, når pejlingerne ikke giver et sted ([Crossing.of]).
+     */
+    private fun drawCrossing(c: Canvas, mv: Projection) {
+        val all = bearings().flatten()
+        // regnes kun om, når pejlingerne har ændret sig
+        val stamp = all.fold(17L) { h, b -> h * 31 + b.t + (b.deg * 10).toLong() }
+        if (stamp != crossingStamp) {
+            crossingStamp = stamp
+            crossing = Crossing.of(all.mapNotNull { b ->
+                if (b.level == null) null else Crossing.Sight(b.lat ?: return@mapNotNull null, b.lon ?: return@mapNotNull null, b.deg, b.swing, b.others.isNotEmpty())
+            })
+        }
+        val at = crossing ?: return
+        area.rewind()
+        for ((i, q) in at.outline().withIndex()) {
+            px(mv, q.first, q.second)
+            if (i == 0) area.moveTo(pt.x.toFloat(), pt.y.toFloat()) else area.lineTo(pt.x.toFloat(), pt.y.toFloat())
+        }
+        area.close()
+        // lyst oven på kilerne, så området kan ses, hvor de ligger tæt
+        p.style = Paint.Style.FILL; p.color = 0x50FFFFFF
+        c.drawPath(area, p)
+        p.style = Paint.Style.STROKE; p.strokeWidth = 4.5f * d; p.color = 0xFF202124.toInt()
+        c.drawPath(area, p)
+        p.strokeWidth = 2 * d; p.color = 0xFFFFC94D.toInt(); p.pathEffect = dashes
+        c.drawPath(area, p)
+        p.pathEffect = null
+        px(mv, at.lat, at.lon)
+        val x = pt.x.toFloat(); val y = pt.y.toFloat()
+        for ((width, color) in listOf(5.5f to 0xFF202124.toInt(), 2.5f to 0xFFFFC94D.toInt())) {
+            p.strokeWidth = width * d; p.color = color
+            c.drawCircle(x, y, 8 * d, p)
+            c.drawLine(x - 15 * d, y, x + 15 * d, y, p); c.drawLine(x, y - 15 * d, x, y + 15 * d, p)
+        }
+        p.style = Paint.Style.FILL; p.textSize = 12 * d
+        val label = "anslået sted · ${at.used} pejlinger"
+        val tx = x + 20 * d; val ty = y + 22 * d; val w = p.measureText(label)
+        p.color = 0xD00E0F12.toInt(); c.drawRect(tx - 4 * d, ty - 14 * d, tx + w + 4 * d, ty + 4 * d, p)
+        p.color = 0xFFFFFFFF.toInt(); c.drawText(label, tx, ty, p)
+    }
+
     private fun drawMarksAndMe(c: Canvas, mv: Projection) {
         drawBearings(c, mv)
+        drawCrossing(c, mv)
         for (list in marks()) for (m in list) {
             px(mv, m.lat ?: continue, m.lon ?: continue)
             drawMark(c, pt.x.toFloat(), pt.y.toFloat(), m)
