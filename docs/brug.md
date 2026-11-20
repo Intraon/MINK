@@ -97,6 +97,8 @@ Ringen om rosetten viser, hvor langt omgangen er nået: den får et stykke for h
 
 Retningen er midten af den brede top og ikke den ene kraftigste måling. På kortet ligger stregen i en kile på 10° til hver side, når stedet har en tydelig retning: så usikker er en pejling, især på afstand og gennem bebyggelse, og det er dér, hvor kilerne fra flere steder dækker hinanden, du skal lede. Kommer signalet næsten lige stærkt fra flere sider, skriver appen **flere retninger** og tegner dem stiplet uden kile. Det er genskin fra noget stort i nærheden, og så er stedet ikke til at pejle fra.
 
+Når pejlinger fra mindst to steder krydser hinanden, tegner kortet et sigtemærke med teksten **anslået sted** og en stiplet ellipse om det. Stedet er det punkt, pejlingerne tilsammen peger på, og senderen ligger sandsynligvis inden for ellipsen. En pejling vejer tungere, jo tættere på den er taget. Steder med flere retninger, steder uden tydelig retning og pejlinger, der blev taget, uden at målet blev hørt, regnes ikke med, og peger en enkelt pejling et helt andet sted hen end resten, udelades den. Er ellipsen lang og smal, er pejlingerne taget fra næsten samme side: tag en fra en anden side, så bliver den kortere. Der tegnes intet, hvis pejlingerne løber næsten parallelt eller ikke mødes.
+
 Appen gemmer også selv en pejling for hvert sted, hvor du har drejet mindst en halv omgang rundt: stregen peger mod midten af toppen, og fotoet er kamerabilledet fra den måling, der blev taget nærmest den retning. Det sker, så snart omgangen er færdig, og ellers når du går mere end 15 m videre, forlader fanen Kamera eller stopper målingen. Hvert sted gemmes én gang. **Mål** vælger målet uden at gå tilbage til vandfaldet.
 
 Det skal du vide:
@@ -121,6 +123,7 @@ Sætter du flueben ved **Et kort, der kan åbnes i en browser**, når du deler, 
 
 - Sporet er en streg farvet efter målets niveau. Hvor ruten går samme vej flere gange, ligger den kraftigste måling øverst, og stille stykker er grå. Et tryk på stregen viser tid, niveau og sted.
 - Hver pejling har en mærkat med nummer og retning. Et tryk åbner pejlingen med dens foto. Retningen er midten af den brede top fra drejningen på stedet. En tydelig retning er en lang streg i en kile på 10° til hver side, en svag er stiplet, og et sted med flere retninger viser dem alle stiplet.
+- **Anslået sted** er krydspejlingen af alle pejlingerne i filen, med samme ellipse som i appen. Et tryk viser, hvor mange pejlinger der er regnet med, og hvor stort området er. Det vises, når alle filens ture er slået til.
 - Ture lige efter hinanden vises som én, og hver tur kan slås til og fra. En skyder skjuler alt under et valgt niveau.
 
 Baggrundskortet hentes, når filen laves, for de områder, turene går igennem, og lægges i selve filen sammen med fotoerne. Filen henter derfor intet, når den åbnes, og virker uden net. Har telefonen ikke net, når filen laves, bliver den lavet uden baggrund.

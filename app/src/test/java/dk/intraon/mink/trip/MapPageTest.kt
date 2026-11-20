@@ -75,7 +75,7 @@ class MapPageTest {
         val html = MapPage.html(template, MapPage.data(listOf(log("20261114_120000", 0, 20, 5.0))), null, mapOf("MINK_pejling_x.jpg" to "QUJDRA=="), "14.11.2026 13:00")
 
         assertTrue(html.contains("\"MINK_pejling_x.jpg\":\"QUJDRA==\""))
-        assertFalse(html.contains("/*DATA*/") || html.contains("/*BASE*/") || html.contains("/*FOTO*/") || html.contains("{{LAVET}}"))
+        assertFalse(html.contains("/*DATA*/") || html.contains("/*KRYDS*/") || html.contains("/*BASE*/") || html.contains("/*FOTO*/") || html.contains("{{LAVET}}"))
         assertFalse("filen må ikke pege ud på nettet", Regex("https?://|//[a-z]").containsMatchIn(html.replace(Regex("//[^\n]*\n"), "\n")))
     }
 }
