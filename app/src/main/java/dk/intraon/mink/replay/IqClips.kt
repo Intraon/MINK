@@ -5,9 +5,9 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.ParcelFileDescriptor
 import android.util.LruCache
 import dk.intraon.mink.waterfall.Scope
-import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
@@ -15,8 +15,8 @@ import java.util.concurrent.Executors
 
 /**
  * Udbruddenes ægte signal fra en turs bølgeform-fil, som små billeder til vandfaldet. Filen læses på en baggrundstråd,
- * ét udsnit ad gangen, når vandfaldet beder om det; [onReady] kaldes på hovedtråden, når et billede er klar.
- * [rate] er filens sample rate. [open] åbner filen og kaldes på baggrundstråden.
+ * ét udsnit ad gangen, når vandfaldet beder om det; [onReady] kaldes på hovedtråden, når et billede er klar, og
+ * når et udsnit ikke kunne læses. [rate] er filens sample rate. [open] åbner filen og kaldes på baggrundstråden.
  */
 class IqClips(private val rate: Int, private val open: () -> FileChannel?, private val onReady: () -> Unit) {
     private val worker = Executors.newSingleThreadExecutor()
@@ -28,6 +28,13 @@ class IqClips(private val rate: Int, private val open: () -> FileChannel?, priva
     private var channel: FileChannel? = null
     private var opened = false
     @Volatile private var closed = false
+    private var got = false
+    /**
+     * Intet udsnit har kunnet læses, og mindst ét er prøvet: filen er væk eller kan ikke åbnes. Så tegner vandfaldet
+     * felter i stedet. Kun hovedtråden læser og sætter den.
+     */
+    var unreadable = false
+        private set
 
     /**
      * Billedet af udbruddets udsnit: [ClipSpectrum.N] søjler fra udsnittets laveste til højeste frekvens og én række
@@ -40,7 +47,10 @@ class IqClips(private val rate: Int, private val open: () -> FileChannel?, priva
             val bmp = if (closed) null else read(b)
             main.post {
                 asked.remove(b.iq)
-                if (bmp == null) failed.add(b.iq) else if (!closed) { cache.put(b.iq, bmp); onReady() }
+                if (closed) return@post
+                if (bmp == null) failed.add(b.iq) else { cache.put(b.iq, bmp); got = true }
+                unreadable = !got
+                onReady()
             }
         }
         return null
@@ -82,9 +92,12 @@ class IqClips(private val rate: Int, private val open: () -> FileChannel?, priva
         /** Flere udsnit end dette venter ikke på at blive læst: ruller man hurtigt forbi, springes de over. */
         private const val QUEUE = 60
 
-        /** Bølgeform-filen bag [uri]. */
+        /**
+         * Bølgeform-filen bag [uri]. Strømmen ejer filen og holder den åben, til kanalen lukkes: en strøm lavet af
+         * det nøgne filnummer gør ikke, og så lukker Android filen, når den rydder op, mens der stadig læses.
+         */
         fun of(ctx: Context, uri: Uri, rate: Int, onReady: () -> Unit) = IqClips(rate, {
-            ctx.contentResolver.openFileDescriptor(uri, "r")?.let { FileInputStream(it.fileDescriptor).channel }
+            ctx.contentResolver.openFileDescriptor(uri, "r")?.let { ParcelFileDescriptor.AutoCloseInputStream(it).channel }
         }, onReady)
     }
 }

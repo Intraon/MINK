@@ -27,6 +27,7 @@ class ReplayPane(private val a: MainActivity, private val onPlace: (Replay.Fix?)
     private val title = TextView(a).apply { textSize = 13f; setTextColor(Ui.TEXT); gravity = Gravity.CENTER_VERTICAL; setPadding(a.dp(10), 0, a.dp(6), 0); maxLines = 2 }
     private val zoomBtn: Button = a.button("normal", Ui.BUTTON) { view.zoom(); name() }.apply { textSize = 13f; setPadding(a.dp(10), 0, a.dp(10), 0) }
     private val clock = SimpleDateFormat("HH:mm:ss", Ui.DA)
+    private val note = TextView(a).apply { textSize = 11f; setTextColor(Ui.DIM); setPadding(a.dp(10), a.dp(3), a.dp(10), a.dp(4)) }
     private var replay: Replay? = null
     private var clips: IqClips? = null
     private var trip = ""
@@ -44,10 +45,6 @@ class ReplayPane(private val a: MainActivity, private val onPlace: (Replay.Fix?)
         bar.addView(a.button("✕", Ui.BUTTON) { onClose() }, LinearLayout.LayoutParams(a.dp(44), a.dp(40)))
         col.addView(bar, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         col.addView(view, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
-        val note = TextView(a).apply {
-            textSize = 11f; setTextColor(Ui.DIM); setPadding(a.dp(10), a.dp(3), a.dp(10), a.dp(4))
-            text = "Genskabt fra turens log. Udbruddene er de målte; støjen imellem dem blev ikke gemt."
-        }
         col.addView(note, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         addView(col, LayoutParams(MATCH_PARENT, MATCH_PARENT))
     }
@@ -56,7 +53,7 @@ class ReplayPane(private val a: MainActivity, private val onPlace: (Replay.Fix?)
     fun open(name: String, r: Replay, wave: Uri?) {
         clips?.close()
         trip = name; replay = r
-        clips = wave?.let { IqClips.of(a, it, r.iqRate) { view.invalidate() } }
+        clips = wave?.let { IqClips.of(a, it, r.iqRate) { view.invalidate(); name() } }
         view.show(r, clips)
         name()
     }
@@ -67,7 +64,21 @@ class ReplayPane(private val a: MainActivity, private val onPlace: (Replay.Fix?)
         onPlace(null)
     }
 
-    private fun name() { zoomBtn.text = view.zoomName() }
+    private fun name() { zoomBtn.text = view.zoomName(); note.text = "Genskabt fra turens log. ${drawn()}" }
+
+    /**
+     * Hvad udbruddene er tegnet af lige nu: det målte signal fra turens bølgeform, eller et felt farvet efter styrken,
+     * når der ses på overblik, når turen ingen bølgeform har på telefonen, eller når den ikke kunne læses.
+     */
+    private fun drawn(): String {
+        val c = clips
+        return when {
+            c == null -> "Turens bølgeform ligger ikke på telefonen, så hvert udbrud er et felt farvet efter styrken."
+            c.unreadable -> "Turens bølgeform kunne ikke læses, så hvert udbrud er et felt farvet efter styrken."
+            !view.detailed -> "I overblik er hvert udbrud et felt farvet efter styrken. Vælg normal eller tæt på for at se signalet."
+            else -> "Udbruddene er det målte signal fra turens bølgeform. Støjen imellem dem blev ikke gemt."
+        }
+    }
 
     /**
      * Vandfaldet, som det ses lige nu, med en bjælke under: turen, klokkeslættet i øverste kant og målets frekvens,
@@ -93,7 +104,7 @@ class ReplayPane(private val a: MainActivity, private val onPlace: (Replay.Fix?)
             c.drawText(text, 8 * dens, y, p)
         }
         line("MINK · tur $trip · ${clock.format(Date(time))}$target", 12f, Ui.TEXT, h + 19 * dens)
-        line("Genskabt fra turens log (${view.zoomName()}): udbruddene er de målte, støjen imellem blev ikke gemt.", 11f, Ui.DIM, h + 38 * dens)
+        line("Genskabt fra turens log (${view.zoomName()}). ${drawn()}", 11f, Ui.DIM, h + 38 * dens)
         return bmp
     }
 

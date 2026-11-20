@@ -71,6 +71,9 @@ class ReplayView(ctx: Context, private val onTime: (Long) -> Unit) : View(ctx) {
         moveTo(t)
     }
 
+    /** Er der zoomet så langt ind, at udbruddets eget signal kan ses? */
+    val detailed: Boolean get() = msPerPx <= STEPS[1]
+
     /** Hvad den aktuelle afstand viser, til knappen. */
     fun zoomName(): String = when (msPerPx) { STEPS[0] -> "tæt på"; STEPS[1] -> "normal"; else -> "overblik" }
 
@@ -114,7 +117,7 @@ class ReplayView(ctx: Context, private val onTime: (Long) -> Unit) : View(ctx) {
             p.style = Paint.Style.FILL; p.color = 0x2230D158
             c.drawRect(xOf(chan - chanBw / 2, r), top, xOf(chan + chanBw / 2, r), h, p)
         }
-        val detail = msPerPx <= STEPS[1] && clips != null
+        val detail = detailed && clips != null
         for (b in r.between(t - ((h - top) * msPerPx).toLong() - 1_000, t + 1_000)) {
             val bmp = if (detail) clips?.get(b) else null
             if (bmp != null) {
